@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:url_launcher/url_launcher.dart';
@@ -778,12 +779,13 @@ class _BottomBar extends StatelessWidget {
                 ),
                 child: ClipPath(
                   clipper: const ShapeBorderClipper(shape: StadiumBorder()),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                  child: _FrostedGlass(
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: ShapeDecoration(
-                        color: colors.surface.withValues(alpha: 0.4),
+                        // Without the blur (web), a bit more solid so the
+                        // icons stay readable over the feed.
+                        color: colors.surface.withValues(alpha: kIsWeb ? 0.86 : 0.4),
                         shape: StadiumBorder(side: BorderSide(color: context.hairline)),
                       ),
                       child: Row(
@@ -819,5 +821,20 @@ class _BottomBar extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Blurs what scrolls behind the bottom bar. Skipped on the web, where the
+/// browser would redraw the blur on every scroll frame and make scrolling
+/// stutter (noticeably on iPhones).
+class _FrostedGlass extends StatelessWidget {
+  const _FrostedGlass({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb) return child;
+    return BackdropFilter(filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6), child: child);
   }
 }

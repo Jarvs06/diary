@@ -34,7 +34,7 @@ jobs:
       - run: flutter test
       - name: Build
         run: >
-          flutter build web --release
+          flutter build web --release --wasm
           --base-href "/${{ github.event.repository.name }}/"
           --dart-define=SUPABASE_URL=${{ vars.SUPABASE_URL }}
           --dart-define=SUPABASE_PUBLISHABLE_KEY=${{ vars.SUPABASE_PUBLISHABLE_KEY }}

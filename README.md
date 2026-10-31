@@ -213,7 +213,7 @@ The same app also builds as a website, so either of you can read and write
 from an iPhone or a computer. It uses the same accounts, passcodes and data.
 
 ```bash
-flutter build web --release --dart-define-from-file=.env   # → build/web
+flutter build web --release --wasm --dart-define-from-file=.env   # → build/web
 ```
 
 Differences from the Android app:
@@ -222,6 +222,10 @@ Differences from the Android app:
   be flagged or taken down.
 - No phone notifications, background checks or fingerprint lock (browsers
   don't offer them without a push server).
+- Built with Flutter's WebAssembly renderer for smoother scrolling (browsers
+  that can't run it get the regular JavaScript version automatically), and
+  without the bottom bar's blur, which made Safari stutter. Safari limits web
+  pages to 60 fps, so ProMotion's 120 Hz is only available to native apps.
 - Photos from an iPhone: pick them as usual. Safari hands the app JPEG copies;
   they're resized to at most 2048 px before uploading.
 - On an iPhone, open the site in Safari → Share → **Add to Home Screen** to get
