@@ -1,0 +1,54 @@
+# Builds the Flutter web version and publishes it to GitHub Pages.
+#
+# One-time setup in the GitHub repository:
+#   Settings → Pages → Source: "GitHub Actions"
+#   Settings → Secrets and variables → Actions → Variables:
+#     SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, APP_KEY   (the same public values as .env)
+name: Deploy web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.32.5
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+      - name: Build
+        run: >
+          flutter build web --release
+          --base-href "/${{ github.event.repository.name }}/"
+          --dart-define=SUPABASE_URL=${{ vars.SUPABASE_URL }}
+          --dart-define=SUPABASE_PUBLISHABLE_KEY=${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          --dart-define=APP_KEY=${{ vars.APP_KEY }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

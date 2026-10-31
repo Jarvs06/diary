@@ -1,0 +1,56 @@
+name: secret_diary
+description: "A private two-person diary with photos, served from Supabase."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_local_notifications: ^20.1.0
+  flutter_secure_storage: ^10.3.4
+  http: ^1.6.0
+  image_picker: ^1.2.1
+  local_auth: ^2.3.0
+  package_info_plus: ^9.0.1
+  supabase_flutter: ^2.15.4
+  url_launcher: ^6.3.2
+  workmanager: 0.9.2
+
+# workmanager 0.9.2's iOS part predates a later 0.9.x interface change;
+# pin the set that matches (0.10+ needs Flutter 3.38).
+dependency_overrides:
+  workmanager_android: 0.9.2
+  workmanager_platform_interface: 0.9.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  fake_async: ^1.3.3
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+    - assets/avatars/
+    - assets/fonts/OFL-GoogleSans.txt
+    - assets/fonts/OFL-GoogleSansFlex.txt
+    - assets/fonts/OFL-MomoSignature.txt
+
+  # Bundled (SIL Open Font License) so nothing is downloaded at runtime.
+  fonts:
+    - family: GoogleSans
+      fonts:
+        - asset: assets/fonts/GoogleSans.ttf
+        - asset: assets/fonts/GoogleSans-Italic.ttf
+          style: italic
+    - family: GoogleSansFlex
+      fonts:
+        - asset: assets/fonts/GoogleSansFlex.ttf
+    - family: MomoSignature
+      fonts:
+        - asset: assets/fonts/MomoSignature.ttf
