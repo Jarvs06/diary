@@ -183,7 +183,7 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Entry'),
+        title: const Text('Post'),
         shape: Border(bottom: BorderSide(color: context.hairline, width: 0.6)),
       ),
       body: ListenableBuilder(

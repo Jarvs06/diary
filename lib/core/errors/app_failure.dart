@@ -86,7 +86,7 @@ class NoteNotFound extends AppFailure {
   const NoteNotFound();
 
   @override
-  String get message => "This note isn't available anymore.";
+  String get message => "This post isn't available anymore.";
 }
 
 /// The content was rejected, e.g. publishing an empty note.
@@ -107,7 +107,7 @@ class EditConflict extends AppFailure {
   final Object latest;
 
   @override
-  String get message => 'This note was changed on another device since you opened it.';
+  String get message => 'This post was changed on another device since you opened it.';
 }
 
 /// The entry was saved but at least one photo change wasn't. The photos that
@@ -119,8 +119,8 @@ class PhotosNotSaved extends AppFailure {
 
   @override
   String get message => cause is InvalidContent
-      ? 'Your entry was saved, but a photo was not. ${cause.message}'
-      : "Your entry was saved, but a photo didn't upload. "
+      ? 'Your post was saved, but a photo was not. ${cause.message}'
+      : "Your post was saved, but a photo didn't upload. "
           'Check your connection and save again to retry.';
 }
 

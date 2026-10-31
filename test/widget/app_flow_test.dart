@@ -113,7 +113,7 @@ void main() {
       expect(find.byKey(const Key('see-more')), findsOneWidget);
 
       await tapKey(tester, const Key('see-more'));
-      expect(find.text('Entry'), findsOneWidget);
+      expect(find.text('Post'), findsOneWidget);
       expect(tester.widget<SelectableText>(find.byKey(const Key('note-body'))).data, long);
       expect(find.byKey(const Key('see-more')), findsNothing);
     });
@@ -210,7 +210,7 @@ void main() {
     testWidgets('an empty feed invites the first entry', (tester) async {
       world = FakeWorld(signedInAs: janinaId, notes: []);
       await start(tester);
-      expect(find.textContaining('No entries yet'), findsOneWidget);
+      expect(find.textContaining('No posts yet'), findsOneWidget);
     });
 
     testWidgets('a loading failure offers a retry', (tester) async {
@@ -280,14 +280,14 @@ void main() {
       await start(tester);
       world.notifications.tapsController.add('n1');
       await tester.pumpAndSettle();
-      expect(find.text('Entry'), findsOneWidget);
+      expect(find.text('Post'), findsOneWidget);
     });
 
     testWidgets('opening the app from a notification goes to that entry', (tester) async {
       world.auth.userId = janinaId;
       world.notifications.launchNoteId = 'n1';
       await start(tester);
-      expect(find.text('Entry'), findsOneWidget);
+      expect(find.text('Post'), findsOneWidget);
     });
 
     testWidgets('notification text for each kind of activity', (tester) async {
@@ -299,11 +299,11 @@ void main() {
         text: text,
         at: t0,
       );
-      expect(of(ActivityKind.post, 'Hello\nmore').title, 'Janina shared a new entry');
+      expect(of(ActivityKind.post, 'Hello\nmore').title, 'Janina shared a new post');
       expect(of(ActivityKind.post, 'Hello\nmore').body, 'Hello');
       expect(of(ActivityKind.post, '').body, 'Photos');
       expect(of(ActivityKind.reply, 'Aww').title, 'Janina replied');
-      expect(of(ActivityKind.like, 'For you').title, 'Janina liked your entry');
+      expect(of(ActivityKind.like, 'For you').title, 'Janina liked your post');
     });
 
     testWidgets('profile offers to allow background running when Android restricts it', (tester) async {
@@ -360,7 +360,7 @@ void main() {
       await start(tester);
       await tapKey(tester, const ValueKey('reply-n1'));
 
-      expect(find.text('Entry'), findsOneWidget);
+      expect(find.text('Post'), findsOneWidget);
       final field = tester.widget<TextField>(find.byKey(const Key('reply-field')));
       expect(field.focusNode!.hasFocus, isTrue);
     });
@@ -446,7 +446,7 @@ void main() {
       await start(tester);
       await compose(tester);
 
-      expect(find.text('New entry'), findsOneWidget);
+      expect(find.text('New post'), findsOneWidget);
       await tester.enterText(find.byKey(const Key('note-title-field')), 'For you, too');
       await tester.enterText(find.byKey(const Key('note-body-field')), 'My entry.');
       await tapKey(tester, const Key('publish-button'));
@@ -504,7 +504,7 @@ void main() {
       await tapKey(tester, const Key('tab-drafts'));
       await openPost(tester, 'd');
 
-      expect(find.text('Edit entry'), findsOneWidget);
+      expect(find.text('Edit post'), findsOneWidget);
       await tapKey(tester, const Key('publish-button'));
       expect(world.notes.store['d']!.status, NoteStatus.published);
     });
@@ -907,13 +907,13 @@ void main() {
       await start(tester);
 
       await deleteFromMenu(tester, 'n1');
-      expect(find.text('Delete entry?'), findsOneWidget);
+      expect(find.text('Delete post?'), findsOneWidget);
       await tapKey(tester, const Key('confirm-delete-button'));
 
       expect(world.notes.deleted, ['n1']);
       expect(world.photos.removedFiles, [photo.storagePath]);
       expect(find.byKey(const ValueKey('post-n1')), findsNothing);
-      expect(find.text('Entry deleted'), findsOneWidget);
+      expect(find.text('Post deleted'), findsOneWidget);
     });
 
     testWidgets('cancelling keeps the entry', (tester) async {

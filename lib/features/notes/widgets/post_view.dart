@@ -276,14 +276,14 @@ class PostView extends StatelessWidget {
   }
 }
 
-/// "Delete entry?" confirmation. Returns true only if the person confirmed.
+/// "Delete post?" confirmation. Returns true only if the person confirmed.
 Future<bool> confirmDelete(BuildContext context) async {
   final ok = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Delete entry?'),
+      title: const Text('Delete post?'),
       content: const Text(
-        "This removes the entry, its photos and its replies for both of you. It can't be undone.",
+        "This removes the post, its photos and its replies for both of you. It can't be undone.",
       ),
       actions: [
         TextButton(

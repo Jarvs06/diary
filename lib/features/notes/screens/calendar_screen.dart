@@ -91,7 +91,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: Text(
-                  'No entries on this day.',
+                  'No posts on this day.',
                   style: context.text.bodyMedium?.copyWith(color: context.muted),
                 ),
               ),

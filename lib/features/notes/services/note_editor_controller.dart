@@ -89,7 +89,7 @@ class NoteEditorController extends ChangeNotifier {
   }) async {
     if (_saving) return null;
     if (status == NoteStatus.published && body.trim().isEmpty) {
-      _failure = const InvalidContent('Write something before sharing this entry.');
+      _failure = const InvalidContent('Write something before sharing this post.');
       _notify();
       return null;
     }

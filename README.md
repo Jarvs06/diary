@@ -291,7 +291,7 @@ avatar has its own colour, since both names start with J.
   also whenever the app is reopened or refreshed.
 - **Notifications:** when the other person shares an entry, replies, or likes
   one of your entries, you get a phone notification ("Janina shared a new
-  entry", "Janina replied", "Janina liked your entry"); tapping it opens the
+  post", "Janina replied", "Janina liked your post"); tapping it opens the
   entry.
   With the app in the background it arrives within a second or two; when the
   app is fully closed, Android checks about every 15 minutes (WorkManager, no

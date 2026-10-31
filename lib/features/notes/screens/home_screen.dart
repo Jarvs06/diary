@@ -349,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Entry deleted')));
+        ..showSnackBar(const SnackBar(content: Text('Post deleted')));
     }
     return true;
   }
@@ -405,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               hasScrollBody: false,
               child: CenteredMessage(
                 icon: Icons.edit_note_rounded,
-                message: 'No entries yet.\nTap + to write the first one.',
+                message: 'No posts yet.\nTap + to write the first one.',
               ),
             )
           else
@@ -484,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              "You're offline. Showing the entries saved on this phone.",
+              "You're offline. Showing the posts saved on this phone.",
               style: context.text.bodySmall?.copyWith(color: context.muted),
             ),
           ),
@@ -606,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               Text(name, key: const Key('profile-name'), style: context.text.headlineSmall),
                               const SizedBox(height: 4),
                               Text(
-                                entries.length == 1 ? '1 entry' : '${entries.length} entries',
+                                entries.length == 1 ? '1 post' : '${entries.length} posts',
                                 style: context.text.bodyMedium?.copyWith(color: context.muted),
                               ),
                             ],
@@ -644,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 color: context.colors.surface,
                 tabBar: TabBar(
                   tabs: [
-                    const Tab(key: Key('tab-entries'), text: 'Entries'),
+                    const Tab(key: Key('tab-entries'), text: 'Posts'),
                     Tab(
                       key: const Key('tab-drafts'),
                       text: drafts.isEmpty ? 'Drafts' : 'Drafts (${drafts.length})',
@@ -799,7 +799,7 @@ class _BottomBar extends StatelessWidget {
                           ),
                           item(
                             key: const Key('new-note-button'),
-                            label: 'New entry',
+                            label: 'New post',
                             asset: AppAssets.navPlus,
                             onTap: onCompose,
                           ),

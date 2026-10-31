@@ -39,12 +39,12 @@ class NewActivity {
   }
 
   String get title => switch (kind) {
-        ActivityKind.post => '$actorName shared a new entry',
+        ActivityKind.post => '$actorName shared a new post',
         ActivityKind.reply => '$actorName replied',
-        ActivityKind.like => '$actorName liked your entry',
+        ActivityKind.like => '$actorName liked your post',
       };
 
-  String get body => preview.isNotEmpty ? preview : (kind == ActivityKind.post ? 'Photos' : 'Your entry');
+  String get body => preview.isNotEmpty ? preview : (kind == ActivityKind.post ? 'Photos' : 'Your post');
 }
 
 /// Phone notifications for what the other person does.
@@ -83,7 +83,7 @@ class DevicePostNotifications implements PostNotifications {
     android: AndroidNotificationDetails(
       'new_posts',
       'New posts',
-      channelDescription: 'New entries, replies and likes from the other person',
+      channelDescription: 'New posts, replies and likes from the other person',
       importance: Importance.high,
       priority: Priority.high,
       icon: _icon,

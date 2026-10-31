@@ -149,7 +149,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
       initialDate: _date,
       firstDate: DateTime(2000),
       lastDate: _date.isAfter(today) ? _date : today,
-      helpText: 'Which day is this entry about?',
+      helpText: 'Which day is this post about?',
     );
     if (picked != null && mounted) setState(() => _date = Dates.dateOnly(picked));
   }
@@ -242,7 +242,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 onPressed: _editor.isSaving ? null : () => Navigator.of(context).maybePop(),
                 child: const Text('Cancel'),
               ),
-              title: Text(_editor.isNew ? 'New entry' : 'Edit entry'),
+              title: Text(_editor.isNew ? 'New post' : 'Edit post'),
               shape: Border(bottom: BorderSide(color: context.hairline, width: 0.6)),
             ),
             body: SafeArea(
