@@ -121,11 +121,22 @@ class _PhotoPlaceholder extends StatelessWidget {
 /// An entry's photos, Threads-style: one photo spans the width; two or
 /// three sit in a row that scrolls sideways. Tapping opens them full screen.
 class PhotoCarousel extends StatelessWidget {
-  const PhotoCarousel({super.key, required this.photos, required this.load, this.height = 240});
+  const PhotoCarousel({
+    super.key,
+    required this.photos,
+    required this.load,
+    this.height = 240,
+    this.padding = EdgeInsets.zero,
+  });
 
   final List<NotePhoto> photos;
   final PhotoLoader load;
   final double height;
+
+  /// Space before the first and after the last photo. The row itself spans
+  /// the full width, so photos scroll right to the screen's edges (as on
+  /// Threads) while the first one lines up with the text.
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
@@ -155,12 +166,16 @@ class PhotoCarousel extends StatelessWidget {
         );
 
     if (photos.length == 1) {
-      return SizedBox(height: height * 1.2, width: double.infinity, child: tile(0, cacheWidth: 1200));
+      return Padding(
+        padding: padding,
+        child: SizedBox(height: height * 1.2, width: double.infinity, child: tile(0, cacheWidth: 1200)),
+      );
     }
     return SizedBox(
       height: height,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        padding: padding,
         itemCount: photos.length,
         separatorBuilder: (_, _) => const SizedBox(width: 6),
         itemBuilder: (_, i) => SizedBox(width: height * 0.8, child: tile(i)),

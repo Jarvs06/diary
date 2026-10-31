@@ -826,6 +826,27 @@ void main() {
     });
   });
 
+  group('photo row', () {
+    testWidgets('starts in line with the text and scrolls to the screen edge', (tester) async {
+      world.auth.userId = janinaId;
+      world.photos.seed('p1', 'n1');
+      world.photos.seed('p2', 'n1');
+      world.photos.seed('p3', 'n1');
+      await start(tester);
+
+      final firstLeft = tester.getTopLeft(find.byKey(const ValueKey('photo-p1'))).dx;
+      final textLeft = tester.getTopLeft(find.byKey(const Key('note-body'))).dx;
+      expect(firstLeft, textLeft);
+
+      await tester.drag(find.byKey(const ValueKey('photo-p2')), const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      final scrolledLeft = tester.getTopLeft(find.byKey(const ValueKey('photo-p2'))).dx;
+      expect(scrolledLeft, lessThan(textLeft)); // passes under the avatar column
+      final screenWidth = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(tester.getTopRight(find.byKey(const ValueKey('photo-p3'))).dx, lessThanOrEqualTo(screenWidth));
+    });
+  });
+
   group('likes', () {
     testWidgets('tapping the heart likes and unlikes', (tester) async {
       world.auth.userId = janinaId;

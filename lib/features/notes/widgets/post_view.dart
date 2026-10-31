@@ -60,44 +60,62 @@ class PostView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final body = note.body.trim();
+    // Text sits to the right of the avatar; photos span the full width so
+    // they scroll edge to edge, starting in line with the text (Threads).
+    const textInset = 16.0 + 36 + 12; // padding + avatar + gap
     final content = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
-      child: Row(
+      padding: const EdgeInsets.only(top: 14, bottom: 10),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Avatar(name: authorName),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 8),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _header(context),
-                if (note.hasTitle) ...[
-                  const SizedBox(height: 2),
-                  Text(note.displayTitle, key: const Key('note-title'), style: context.text.titleSmall),
-                ],
-                if (body.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: full
-                        ? SelectableText(body, key: const Key('note-body'), style: context.text.bodyLarge)
-                        : _ClippedText(
-                            text: body,
-                            maxLines: photos.isEmpty ? linesWithoutPhotos : linesWithPhotos,
-                            style: context.text.bodyLarge!,
-                            onSeeMore: onTap,
-                          ),
+                Avatar(name: authorName),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _header(context),
+                      if (note.hasTitle) ...[
+                        const SizedBox(height: 2),
+                        Text(note.displayTitle, key: const Key('note-title'), style: context.text.titleSmall),
+                      ],
+                      if (body.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: full
+                              ? SelectableText(body, key: const Key('note-body'), style: context.text.bodyLarge)
+                              : _ClippedText(
+                                  text: body,
+                                  maxLines: photos.isEmpty ? linesWithoutPhotos : linesWithPhotos,
+                                  style: context.text.bodyLarge!,
+                                  onSeeMore: onTap,
+                                ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-                if (photos.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  PhotoCarousel(photos: photos, load: loadPhoto, height: full ? 280 : 220),
-                ],
-                const SizedBox(height: 4),
-                _actions(context),
+                ),
               ],
             ),
+          ),
+          if (photos.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            PhotoCarousel(
+              photos: photos,
+              load: loadPhoto,
+              height: full ? 280 : 240,
+              padding: const EdgeInsets.only(left: textInset, right: 16),
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.only(left: textInset, right: 8, top: 4),
+            child: _actions(context),
           ),
         ],
       ),
