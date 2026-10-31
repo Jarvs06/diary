@@ -37,6 +37,9 @@ Future<void> main() async {
     return;
   }
 
+  // Started now so it overlaps with the session being restored below.
+  final packageInfo = PackageInfo.fromPlatform();
+
   await Supabase.initialize(
     url: config.supabaseUrl,
     // The publishable key (or legacy anon key). Public by design; RLS and the
@@ -62,7 +65,7 @@ Future<void> main() async {
     // Checks for the other person's new entries while the app is closed.
     unawaited(scheduleBackgroundChecks().catchError((Object _) {}));
   }
-  final package = await PackageInfo.fromPlatform();
+  final package = await packageInfo;
   runApp(
     LetterApp(
       dependencies: AppDependencies(
