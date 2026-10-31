@@ -23,7 +23,17 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <!-- The bar behind the clock follows the app's theme: black in dark mode,
+       cream in light mode. -->
+  <meta name="theme-color" content="#FEFAF3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <style>
+    html, body { background: #FEFAF3; }
+    @media (prefers-color-scheme: dark) { html, body { background: #000000; } }
+  </style>
   <meta name="apple-mobile-web-app-title" content="Diary">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
