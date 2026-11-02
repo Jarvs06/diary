@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/network/backend_client.dart';
 import '../models/photo.dart';
+import '../services/photo_preview.dart';
 
 abstract interface class PhotosRepository {
   /// The photos of one entry, oldest first.
@@ -15,11 +16,7 @@ abstract interface class PhotosRepository {
 
   /// Uploads [photo] and attaches it to the entry. Retrying with the same
   /// [id] never adds it twice.
-  Future<NotePhoto> addPhoto({
-    required String id,
-    required String noteId,
-    required PickedPhoto photo,
-  });
+  Future<NotePhoto> addPhoto({required String id, required String noteId, required PickedPhoto photo});
 
   /// Detaches the photo and deletes its file.
   Future<void> removePhoto(NotePhoto photo);
@@ -30,6 +27,10 @@ abstract interface class PhotosRepository {
 
   /// The image bytes for a saved photo (cached; photo files never change).
   Future<Uint8List> loadPhoto(String storagePath);
+
+  /// The photo's small preview, for the feed; the full photo when it has
+  /// no preview (photos added before previews existed).
+  Future<Uint8List> loadPreview(String storagePath);
 }
 
 class SupabasePhotosRepository implements PhotosRepository {
@@ -47,37 +48,33 @@ class SupabasePhotosRepository implements PhotosRepository {
 
   @override
   Future<List<NotePhoto>> fetchPhotos(String noteId) => _guard(() async {
-        final rows = await _client
-            .from('note_images')
-            .select(NotePhoto.columns)
-            .eq('note_id', noteId)
-            .order('created_at')
-            .timeout(timeout);
-        return rows.map(NotePhoto.fromJson).toList();
-      });
+    final rows = await _client
+        .from('note_images')
+        .select(NotePhoto.columns)
+        .eq('note_id', noteId)
+        .order('created_at')
+        .timeout(timeout);
+    return rows.map(NotePhoto.fromJson).toList();
+  });
 
   @override
   Future<Map<String, List<NotePhoto>>> fetchPhotosFor(List<String> noteIds) => _guard(() async {
-        if (noteIds.isEmpty) return const {};
-        final rows = await _client
-            .from('note_images')
-            .select(NotePhoto.columns)
-            .inFilter('note_id', noteIds)
-            .order('created_at')
-            .timeout(timeout);
-        final byNote = <String, List<NotePhoto>>{};
-        for (final photo in rows.map(NotePhoto.fromJson)) {
-          (byNote[photo.noteId] ??= []).add(photo);
-        }
-        return byNote;
-      });
+    if (noteIds.isEmpty) return const {};
+    final rows = await _client
+        .from('note_images')
+        .select(NotePhoto.columns)
+        .inFilter('note_id', noteIds)
+        .order('created_at')
+        .timeout(timeout);
+    final byNote = <String, List<NotePhoto>>{};
+    for (final photo in rows.map(NotePhoto.fromJson)) {
+      (byNote[photo.noteId] ??= []).add(photo);
+    }
+    return byNote;
+  });
 
   @override
-  Future<NotePhoto> addPhoto({
-    required String id,
-    required String noteId,
-    required PickedPhoto photo,
-  }) =>
+  Future<NotePhoto> addPhoto({required String id, required String noteId, required PickedPhoto photo}) =>
       _guard(() async {
         final path = '$noteId/$id.${photo.extension}';
         try {
@@ -92,6 +89,20 @@ class SupabasePhotosRepository implements PhotosRepository {
           // Uploaded by an earlier attempt whose response was lost.
           if (e.statusCode != '409' && e.error != 'Duplicate') rethrow;
         }
+        // The feed's lighter copy. Best effort: without it the feed just
+        // shows the full photo.
+        try {
+          final preview = await makePhotoPreview(photo.bytes);
+          if (preview != null) {
+            await _files
+                .uploadBinary(
+                  NotePhoto.previewPathOf(path),
+                  preview,
+                  fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+                )
+                .timeout(const Duration(minutes: 1));
+          }
+        } catch (_) {}
         try {
           final row = await _client
               .from('note_images')
@@ -114,22 +125,44 @@ class SupabasePhotosRepository implements PhotosRepository {
 
   @override
   Future<void> removePhoto(NotePhoto photo) => _guard(() async {
-        await _client.from('note_images').delete().eq('id', photo.id).timeout(timeout);
-        _cache.remove(photo.storagePath);
-        // Once the row is gone nobody else can see the file, so a failed
-        // cleanup here only leaves an invisible orphan behind.
-        try {
-          await _files.remove([photo.storagePath]).timeout(timeout);
-        } catch (_) {}
-      });
+    await _client.from('note_images').delete().eq('id', photo.id).timeout(timeout);
+    _cache.remove(photo.storagePath);
+    _cache.remove(photo.previewPath);
+    // Once the row is gone nobody else can see the files, so a failed
+    // cleanup here only leaves an invisible orphan behind.
+    try {
+      await _files.remove([photo.storagePath, photo.previewPath]).timeout(timeout);
+    } catch (_) {}
+  });
 
   @override
   Future<void> removeFiles(List<String> storagePaths) async {
     if (storagePaths.isEmpty) return;
-    storagePaths.forEach(_cache.remove);
+    final all = [...storagePaths, ...storagePaths.map(NotePhoto.previewPathOf)];
+    all.forEach(_cache.remove);
     try {
-      await _files.remove(storagePaths).timeout(timeout);
+      await _files.remove(all).timeout(timeout);
     } catch (_) {}
+  }
+
+  @override
+  Future<Uint8List> loadPreview(String storagePath) {
+    final previewPath = NotePhoto.previewPathOf(storagePath);
+    final cached = _cache.remove(previewPath);
+    if (cached != null) return _cache[previewPath] = cached;
+
+    final future = _files
+        .download(previewPath)
+        .timeout(const Duration(minutes: 1))
+        // No preview (an older photo, or its upload failed): use the photo.
+        .catchError((Object _) => loadPhoto(storagePath));
+    _cache[previewPath] = future;
+    if (_cache.length > _cacheSize) _cache.remove(_cache.keys.first);
+    future.catchError((Object _) {
+      if (identical(_cache[previewPath], future)) _cache.remove(previewPath);
+      return Uint8List(0);
+    });
+    return future;
   }
 
   @override

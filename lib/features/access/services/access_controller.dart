@@ -10,8 +10,8 @@ import '../models/welcome_content.dart';
 /// it is passed straight through to the server and forgotten.
 class AccessController extends ChangeNotifier {
   AccessController({required AccessRepository repository, AppFailure? initialNotice})
-      : _repository = repository,
-        _failure = initialNotice;
+    : _repository = repository,
+      _failure = initialNotice;
 
   final AccessRepository _repository;
 

@@ -12,6 +12,7 @@ import 'package:secret_diary/core/storage/local_store.dart';
 import 'package:secret_diary/core/sync/sync_service.dart';
 import 'package:secret_diary/core/updates/releases.dart';
 import 'package:secret_diary/features/access/data/access_repository.dart';
+import 'package:secret_diary/features/export/diary_export.dart';
 import 'package:secret_diary/features/access/models/welcome_content.dart';
 import 'package:secret_diary/features/notes/data/notes_repository.dart';
 import 'package:secret_diary/features/notes/models/note.dart';
@@ -148,6 +149,17 @@ class FakeAccessRepository implements AccessRepository {
     final id = passcodes[passcode];
     if (id == null) throw const IncorrectPasscode(attemptsRemaining: 4);
     auth.userId = id;
+    return id;
+  }
+
+  int verifyCalls = 0;
+
+  @override
+  Future<String> verifyPasscode(String passcode) async {
+    verifyCalls++;
+    if (nextFailure != null) throw nextFailure!;
+    final id = passcodes[passcode];
+    if (id == null) throw const IncorrectPasscode(attemptsRemaining: 4);
     return id;
   }
 }
@@ -336,6 +348,13 @@ class FakeRepliesRepository implements RepliesRepository {
       body: body,
       createdAt: notes._tick(),
     );
+  }
+
+  @override
+  Future<List<Reply>> fetchRepliesFor(List<String> noteIds) async {
+    if (nextFailure != null) throw nextFailure!;
+    return store.values.where((r) => noteIds.contains(r.noteId)).toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
   @override
@@ -532,6 +551,15 @@ class FakePhotosRepository implements PhotosRepository {
     return bytes;
   }
 
+  /// Paths the feed asked for as previews.
+  final previewsLoaded = <String>[];
+
+  @override
+  Future<Uint8List> loadPreview(String storagePath) {
+    previewsLoaded.add(storagePath);
+    return loadPhoto(storagePath);
+  }
+
   /// A photo already saved on the server.
   NotePhoto seed(String id, String noteId, {String authorId = meId}) {
     final path = '$noteId/$id.png';
@@ -598,9 +626,13 @@ class FakeWorld {
   final activity = FakeActivityChecker();
   final store = FakeLocalStore();
   final screenLock = FakeScreenLock();
+
+  /// Replaces [screenLock], e.g. with the web version's passcode lock.
+  ScreenLock? screenLockOverride;
   final background = FakeBackgroundRunning();
   final releases = FakeReleasesRepository();
   int buildNumber = 1;
+  final exportSaver = FakeExportSaver();
 
   AppDependencies get dependencies => AppDependencies(
     accessRepository: access,
@@ -614,10 +646,11 @@ class FakeWorld {
     notifications: notifications,
     activity: activity,
     localStore: store,
-    screenLock: screenLock,
+    screenLock: screenLockOverride ?? screenLock,
     backgroundRunning: background,
     releases: releases,
     buildNumber: buildNumber,
+    exportSaver: exportSaver,
   );
 }
 
@@ -691,6 +724,12 @@ class FakeScreenLock implements ScreenLock {
     prompts++;
     return succeed;
   }
+
+  @override
+  bool get usesPasscode => false;
+
+  @override
+  Future<AppFailure?> unlockWithPasscode(String passcode) async => const NotAllowed();
 }
 
 class FakeBackgroundRunning implements BackgroundRunning {
@@ -709,4 +748,15 @@ class FakeReleasesRepository implements ReleasesRepository {
 
   @override
   Future<AppRelease?> latest() async => release;
+}
+
+class FakeExportSaver implements ExportSaver {
+  Uint8List? bytes;
+  String? fileName;
+
+  @override
+  Future<void> save(Uint8List bytes, String fileName) async {
+    this.bytes = bytes;
+    this.fileName = fileName;
+  }
 }

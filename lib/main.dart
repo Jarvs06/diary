@@ -19,6 +19,7 @@ import 'core/storage/local_store.dart';
 import 'core/sync/sync_service.dart';
 import 'core/updates/releases.dart';
 import 'features/access/data/access_repository.dart';
+import 'features/export/diary_export.dart';
 import 'features/notes/data/notes_repository.dart';
 import 'features/participants/data/participants_repository.dart';
 import 'features/photos/data/photos_repository.dart';
@@ -66,14 +67,11 @@ Future<void> main() async {
     unawaited(scheduleBackgroundChecks().catchError((Object _) {}));
   }
   final package = await packageInfo;
+  final access = SupabaseAccessRepository(SupabaseBackendClient(client), auth, appKey: config.appKey);
   runApp(
     LetterApp(
       dependencies: AppDependencies(
-        accessRepository: SupabaseAccessRepository(
-          SupabaseBackendClient(client),
-          auth,
-          appKey: config.appKey,
-        ),
+        accessRepository: access,
         authSession: auth,
         participantsRepository: SupabaseParticipantsRepository(client),
         notesRepository: SupabaseNotesRepository(client),
@@ -84,10 +82,11 @@ Future<void> main() async {
         notifications: notifications,
         activity: SupabaseActivityChecker(client, notifications),
         localStore: const SecureLocalStore(),
-        screenLock: kIsWeb ? const NoScreenLock() : DeviceScreenLock(),
+        screenLock: kIsWeb ? PasscodeScreenLock(access, auth) : DeviceScreenLock(),
         backgroundRunning: DeviceBackgroundRunning(),
         releases: SupabaseReleasesRepository(client),
         buildNumber: int.tryParse(package.buildNumber) ?? 0,
+        exportSaver: const ShareExportSaver(),
       ),
     ),
   );

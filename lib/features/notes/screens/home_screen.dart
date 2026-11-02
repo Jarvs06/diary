@@ -10,6 +10,8 @@ import '../../../core/app_dependencies.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/updates/releases.dart';
+import '../../../core/utils/dates.dart';
+import '../../export/diary_export.dart';
 import '../../../core/widgets/ornaments.dart';
 import '../../access/screens/passcode_screen.dart';
 import '../models/note.dart';
@@ -248,6 +250,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) unawaited(_notes.refresh());
   }
 
+  /// Builds the backup .zip (with a progress dialog) and hands it to the
+  /// share sheet / browser download. Only shown to the author.
+  Future<void> _export() async {
+    final progress = ValueNotifier<(int, int)>((0, 0));
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        key: const Key('export-progress'),
+        content: ValueListenableBuilder(
+          valueListenable: progress,
+          builder: (context, value, _) => Row(
+            children: [
+              const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  value.$2 == 0 ? 'Preparing your diary…' : 'Adding photos ${value.$1} of ${value.$2}…',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    String? message;
+    try {
+      final bytes = await DiaryExporter(
+        replies: _deps.repliesRepository,
+        photos: _deps.photosRepository,
+      ).build(notes: _notes.everything, people: _notes.people, onProgress: (d, t) => progress.value = (d, t));
+      final day = Dates.iso(Dates.today());
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      await _deps.exportSaver.save(bytes, 'our-diary-$day.zip');
+    } on AppFailure catch (f) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      message = "Couldn't export: ${f.message}";
+    } catch (_) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      message = "Couldn't export. Please try again.";
+    } finally {
+      progress.dispose();
+    }
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   Future<void> _lock() async {
     _goToPasscode();
     await _deps.authSession.signOut();
@@ -323,6 +375,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       authorName: _notes.nameOf(note.authorId),
       photos: _notes.photosOf(note.id),
       loadPhoto: _deps.photosRepository.loadPhoto,
+      loadPreview: _deps.photosRepository.loadPreview,
       liked: note.isLikedBy(_notes.meId),
       onTap: () => note.isDraft ? _compose(existing: note) : _open(note),
       onLike: note.isDraft ? null : () => _like(note),
@@ -622,6 +675,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       icon: const Icon(Icons.lock_outline, size: 18),
                       label: const Text('Lock'),
                     ),
+                    if (me?.key == 'author') ...[
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        key: const Key('export-button'),
+                        onPressed: _export,
+                        icon: const Icon(Icons.download_outlined, size: 18),
+                        label: const Text('Export diary'),
+                      ),
+                    ],
                     if (!_backgroundOk) ...[
                       const SizedBox(height: 10),
                       OutlinedButton.icon(

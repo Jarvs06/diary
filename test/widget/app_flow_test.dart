@@ -1,6 +1,10 @@
+import 'dart:convert';
+
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secret_diary/app.dart';
+import 'package:secret_diary/core/device/device_services.dart';
 import 'package:secret_diary/core/errors/app_failure.dart';
 import 'package:secret_diary/core/notifications/post_notifications.dart';
 import 'package:secret_diary/core/sync/sync_service.dart';
@@ -345,6 +349,31 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('app-lock')), findsOneWidget);
+    });
+
+    testWidgets('web: asks for your own passcode, which the server checks', (tester) async {
+      world.auth.userId = janinaId;
+      world.screenLockOverride = PasscodeScreenLock(world.access, world.auth);
+      await start(tester);
+      expect(find.byKey(const Key('app-lock')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('passcode-field')), '999999');
+      await tapKey(tester, const Key('unlock-button'));
+      expect(find.byKey(const Key('app-lock')), findsOneWidget);
+      expect(find.textContaining("That's not quite it"), findsOneWidget);
+
+      // The other person's passcode doesn't unlock (or switch) your app.
+      await tester.enterText(find.byKey(const Key('passcode-field')), '111111');
+      await tapKey(tester, const Key('unlock-button'));
+      expect(find.byKey(const Key('app-lock')), findsOneWidget);
+      expect(world.auth.userId, janinaId);
+
+      await tester.enterText(find.byKey(const Key('passcode-field')), '135790');
+      await tapKey(tester, const Key('unlock-button'));
+      expect(find.byKey(const Key('app-lock')), findsNothing);
+      expect(find.byKey(const Key('feed')), findsOneWidget);
+      expect(world.access.verifyCalls, 3);
+      expect(world.access.signInCalls, 0); // checking never replaces the session
     });
 
     testWidgets('no screen lock on the phone: no app lock, and signed out: no app lock', (tester) async {
@@ -827,6 +856,15 @@ void main() {
   });
 
   group('photo row', () {
+    testWidgets('the feed loads light previews; opening a photo loads the full one', (tester) async {
+      world.auth.userId = janinaId;
+      world.photos.seed('p1', 'n1');
+      await start(tester);
+      expect(world.photos.previewsLoaded, isNotEmpty);
+      await tapKey(tester, const ValueKey('photo-p1'));
+      expect(find.byKey(const Key('photo-viewer')), findsOneWidget);
+    });
+
     testWidgets('starts in line with the text and scrolls to the screen edge', (tester) async {
       world.auth.userId = janinaId;
       world.photos.seed('p1', 'n1');
@@ -844,6 +882,37 @@ void main() {
       expect(scrolledLeft, lessThan(textLeft)); // passes under the avatar column
       final screenWidth = tester.view.physicalSize.width / tester.view.devicePixelRatio;
       expect(tester.getTopRight(find.byKey(const ValueKey('photo-p3'))).dx, lessThanOrEqualTo(screenWidth));
+    });
+  });
+
+  group('export (author only)', () {
+    testWidgets('Janina has no export button', (tester) async {
+      world.auth.userId = janinaId;
+      await start(tester);
+      await tapKey(tester, const Key('nav-profile'));
+      expect(find.byKey(const Key('export-button')), findsNothing);
+    });
+
+    testWidgets('Jarvey exports a zip with the posts, replies and photos', (tester) async {
+      world.auth.userId = meId;
+      world.replies.store['r1'] = reply();
+      world.photos.seed('p1', 'n1');
+      await start(tester);
+      await tapKey(tester, const Key('nav-profile'));
+      await tester.tap(find.byKey(const Key('export-button')));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pumpAndSettle();
+
+      expect(world.exportSaver.fileName, startsWith('our-diary-'));
+      final zip = ZipDecoder().decodeBytes(world.exportSaver.bytes!);
+      final names = zip.files.map((f) => f.name).toList();
+      expect(names, containsAll(['diary.json', 'diary.html']));
+      expect(names.where((n) => n.startsWith('photos/')), hasLength(1));
+      final json = jsonDecode(utf8.decode(zip.findFile('diary.json')!.content as List<int>)) as Map<String, dynamic>;
+      final post = (json['posts'] as List).single as Map<String, dynamic>;
+      expect(post['author'], 'Jarvey');
+      expect((post['replies'] as List).single['body'], 'Thank you.');
+      expect(find.byKey(const Key('export-progress')), findsNothing);
     });
   });
 

@@ -1,6 +1,10 @@
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../features/access/data/access_repository.dart';
+import '../auth/auth_session.dart';
+import '../errors/app_failure.dart';
+
 /// The phone's own lock (fingerprint, face, PIN or pattern), used as the
 /// app lock.
 abstract interface class ScreenLock {
@@ -9,10 +13,23 @@ abstract interface class ScreenLock {
 
   /// Shows the system prompt. True when the person unlocked.
   Future<bool> unlock();
+
+  /// True when unlocking means typing your app passcode (the web version)
+  /// instead of the phone's own prompt.
+  bool get usesPasscode;
+
+  /// Checks [passcode] for the [usesPasscode] lock. Null when it's yours.
+  Future<AppFailure?> unlockWithPasscode(String passcode);
 }
 
 class DeviceScreenLock implements ScreenLock {
   final _auth = LocalAuthentication();
+
+  @override
+  bool get usesPasscode => false;
+
+  @override
+  Future<AppFailure?> unlockWithPasscode(String passcode) async => const NotAllowed();
 
   @override
   Future<bool> isAvailable() async {
@@ -69,13 +86,31 @@ class DeviceBackgroundRunning implements BackgroundRunning {
   }
 }
 
-/// The web version has no access to the phone's lock.
-class NoScreenLock implements ScreenLock {
-  const NoScreenLock();
+/// The web version can't use the phone's lock, so it asks for your app
+/// passcode again. The server checks it (with the usual wrong-try limits),
+/// and it must be the signed-in person's own passcode.
+class PasscodeScreenLock implements ScreenLock {
+  PasscodeScreenLock(this._access, this._auth);
+
+  final AccessRepository _access;
+  final AuthSession _auth;
 
   @override
-  Future<bool> isAvailable() async => false;
+  bool get usesPasscode => true;
 
   @override
-  Future<bool> unlock() async => true;
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<bool> unlock() async => false;
+
+  @override
+  Future<AppFailure?> unlockWithPasscode(String passcode) async {
+    try {
+      final id = await _access.verifyPasscode(passcode);
+      return id == _auth.userId ? null : const IncorrectPasscode();
+    } on AppFailure catch (f) {
+      return f;
+    }
+  }
 }

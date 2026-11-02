@@ -9,6 +9,9 @@ abstract interface class RepliesRepository {
   /// Replies under a note, oldest first.
   Future<List<Reply>> fetchReplies(String noteId);
 
+  /// Replies under several notes at once (for the export), oldest first.
+  Future<List<Reply>> fetchRepliesFor(List<String> noteIds);
+
   /// Sends a reply with a device-generated [id]; retrying with the same id
   /// never creates a duplicate.
   Future<Reply> sendReply({required String id, required String noteId, required String body});
@@ -33,6 +36,23 @@ class SupabaseRepliesRepository implements RepliesRepository {
           .from('replies')
           .select(Reply.columns)
           .eq('note_id', noteId)
+          .order('created_at')
+          .order('id')
+          .timeout(timeout);
+      return rows.map(Reply.fromJson).toList();
+    } catch (e) {
+      throw failureFromData(e);
+    }
+  }
+
+  @override
+  Future<List<Reply>> fetchRepliesFor(List<String> noteIds) async {
+    if (noteIds.isEmpty) return const [];
+    try {
+      final rows = await _client
+          .from('replies')
+          .select(Reply.columns)
+          .inFilter('note_id', noteIds)
           .order('created_at')
           .order('id')
           .timeout(timeout);

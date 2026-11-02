@@ -18,6 +18,7 @@ class PostView extends StatelessWidget {
     required this.authorName,
     required this.photos,
     required this.loadPhoto,
+    this.loadPreview,
     required this.liked,
     this.full = false,
     this.isNew = false,
@@ -32,6 +33,9 @@ class PostView extends StatelessWidget {
   final String authorName;
   final List<NotePhoto> photos;
   final PhotoLoader loadPhoto;
+
+  /// Loads the lighter preview shown in the post; full photos open from it.
+  final PhotoLoader? loadPreview;
 
   /// Whether the signed-in person has liked it.
   final bool liked;
@@ -89,7 +93,11 @@ class PostView extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: full
-                              ? SelectableText(body, key: const Key('note-body'), style: context.text.bodyLarge)
+                              ? SelectableText(
+                                  body,
+                                  key: const Key('note-body'),
+                                  style: context.text.bodyLarge,
+                                )
                               : _ClippedText(
                                   text: body,
                                   maxLines: photos.isEmpty ? linesWithoutPhotos : linesWithPhotos,
@@ -108,7 +116,8 @@ class PostView extends StatelessWidget {
             const SizedBox(height: 10),
             PhotoCarousel(
               photos: photos,
-              load: loadPhoto,
+              load: loadPreview ?? loadPhoto,
+              loadFull: loadPhoto,
               height: full ? 280 : 240,
               padding: const EdgeInsets.only(left: textInset, right: 16),
             ),

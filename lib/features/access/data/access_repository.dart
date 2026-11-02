@@ -9,6 +9,11 @@ abstract interface class AccessRepository {
   /// Signs in whoever owns [passcode] and returns their participant id.
   /// Throws an [AppFailure] otherwise.
   Future<String> signIn(String passcode);
+
+  /// Whose passcode [passcode] is (their participant id), checked by the
+  /// server with the same wrong-try limits as signing in, without changing
+  /// who is signed in. Throws an [AppFailure] for a wrong passcode.
+  Future<String> verifyPasscode(String passcode);
 }
 
 class SupabaseAccessRepository implements AccessRepository {
@@ -27,6 +32,19 @@ class SupabaseAccessRepository implements AccessRepository {
     } catch (e) {
       throw failureFromBackend(e);
     }
+  }
+
+  @override
+  Future<String> verifyPasscode(String passcode) async {
+    final Map<String, dynamic> data;
+    try {
+      data = await _backend.invokeFunction('sign-in', body: {'passcode': passcode});
+    } catch (e) {
+      throw failureFromBackend(e);
+    }
+    final participantId = data['participant_id'];
+    if (participantId is! String) throw const UnexpectedFailure();
+    return participantId;
   }
 
   @override

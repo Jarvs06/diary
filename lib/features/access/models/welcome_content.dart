@@ -1,10 +1,6 @@
 /// Text shown on the passcode screen, editable in Supabase.
 class WelcomeContent {
-  const WelcomeContent({
-    required this.recipientName,
-    required this.title,
-    required this.message,
-  });
+  const WelcomeContent({required this.recipientName, required this.title, required this.message});
 
   final String recipientName;
   final String title;
@@ -25,9 +21,7 @@ class WelcomeContent {
     final message = text('welcome_message');
     return WelcomeContent(
       recipientName: name,
-      title: title.isNotEmpty
-          ? title
-          : (name.isNotEmpty ? 'Hi, $name.' : fallback.title),
+      title: title.isNotEmpty ? title : (name.isNotEmpty ? 'Hi, $name.' : fallback.title),
       message: message.isNotEmpty ? message : fallback.message,
     );
   }

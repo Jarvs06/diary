@@ -220,8 +220,10 @@ Differences from the Android app:
 - It's called **Our Diary** with the Diary logo, not Threads. A public website
   that looks like Threads with a login box would look like phishing and could
   be flagged or taken down.
-- No phone notifications, background checks or fingerprint lock (browsers
-  don't offer them without a push server).
+- No phone notifications or background checks (browsers don't offer them
+  without a push server). Instead of the fingerprint lock, the website asks for
+  your passcode again when it opens and after 2 minutes away; the server checks
+  it with the usual wrong-try limits, and only your own passcode unlocks it.
 - Built with Flutter's WebAssembly renderer for smoother scrolling (browsers
   that can't run it get the regular JavaScript version automatically), and
   without the bottom bar's blur, which made Safari stutter. Safari limits web
@@ -300,6 +302,14 @@ avatar has its own colour, since both names start with J.
   announced. After **Lock**, the phone stops checking until you log in again.
   On phones that stop background apps to save battery, Profile shows **Allow
   notifications in the background**.
+- **Export (Jarvey only):** Profile → **Export diary** makes one `.zip` with
+  `diary.html` (open it in any browser to read everything), `diary.json` (all
+  the data) and the full photos, then opens the share sheet so you can save it
+  to Files or Google Drive. Supabase's free plan has no backups, so export now
+  and then.
+- **Photo previews:** each photo is also saved as a small preview (at most
+  900 px); the feed shows previews and the full photo loads when you open it.
+  Photos added before previews existed keep using the full image.
 - **App lock:** if the phone has a screen lock, the app asks for it
   (fingerprint, face, PIN or pattern) when it opens and when you come back
   after 2 minutes away. The diary is also hidden in the recent-apps preview,
@@ -312,9 +322,9 @@ phones.
 ## 5. Tests
 
 ```bash
-flutter test                                          # 125 unit + widget tests
+flutter test                                          # 133 unit + widget tests
 deno test supabase/functions/_shared/crypto_test.ts   # helper crypto
-deno run -A supabase/tests/migrations_test.ts .       # 102 RLS / database / storage checks
+deno run -A supabase/tests/migrations_test.ts .       # 108 RLS / database / storage checks
 ```
 
 The database tests run the real migrations in PGlite (Postgres in WebAssembly)

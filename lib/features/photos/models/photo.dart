@@ -20,13 +20,20 @@ class NotePhoto {
 
   static const columns = 'id, note_id, author_id, storage_path, created_at';
 
+  /// The small preview stored next to the photo (see [previewPathOf]).
+  String get previewPath => previewPathOf(storagePath);
+
+  /// `<note id>/<photo id>.thumb.jpg` for `<note id>/<photo id>.<ext>`.
+  static String previewPathOf(String storagePath) =>
+      storagePath.replaceFirst(RegExp(r'\.(jpg|png|webp)$'), '.thumb.jpg');
+
   factory NotePhoto.fromJson(Map<String, dynamic> json) => NotePhoto(
-        id: json['id'] as String,
-        noteId: json['note_id'] as String,
-        authorId: json['author_id'] as String,
-        storagePath: json['storage_path'] as String,
-        createdAt: DateTime.parse(json['created_at'] as String),
-      );
+    id: json['id'] as String,
+    noteId: json['note_id'] as String,
+    authorId: json['author_id'] as String,
+    storagePath: json['storage_path'] as String,
+    createdAt: DateTime.parse(json['created_at'] as String),
+  );
 }
 
 /// A photo chosen on this phone, already resized, not yet uploaded.
@@ -42,23 +49,35 @@ class PickedPhoto {
   final String extension;
 
   String get contentType => switch (extension) {
-        'png' => 'image/png',
-        'webp' => 'image/webp',
-        _ => 'image/jpeg',
-      };
+    'png' => 'image/png',
+    'webp' => 'image/webp',
+    _ => 'image/jpeg',
+  };
 
   /// Reads the format from the file's first bytes (never trusts the name).
   /// Returns null for anything other than JPEG, PNG or WebP.
   static String? detectExtension(Uint8List b) {
     if (b.length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return 'jpg';
     if (b.length >= 8 &&
-        b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47 &&
-        b[4] == 0x0D && b[5] == 0x0A && b[6] == 0x1A && b[7] == 0x0A) {
+        b[0] == 0x89 &&
+        b[1] == 0x50 &&
+        b[2] == 0x4E &&
+        b[3] == 0x47 &&
+        b[4] == 0x0D &&
+        b[5] == 0x0A &&
+        b[6] == 0x1A &&
+        b[7] == 0x0A) {
       return 'png';
     }
     if (b.length >= 12 &&
-        b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 &&
-        b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50) {
+        b[0] == 0x52 &&
+        b[1] == 0x49 &&
+        b[2] == 0x46 &&
+        b[3] == 0x46 &&
+        b[8] == 0x57 &&
+        b[9] == 0x45 &&
+        b[10] == 0x42 &&
+        b[11] == 0x50) {
       return 'webp';
     }
     return null;

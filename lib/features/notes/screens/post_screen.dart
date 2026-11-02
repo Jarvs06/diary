@@ -219,6 +219,7 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
                           authorName: _people.nameOf(note.authorId),
                           photos: _thread.photos,
                           loadPhoto: _deps.photosRepository.loadPhoto,
+                          loadPreview: _deps.photosRepository.loadPreview,
                           full: true,
                           liked: note.isLikedBy(_people.meId),
                           onLike: note.isDraft ? null : _like,

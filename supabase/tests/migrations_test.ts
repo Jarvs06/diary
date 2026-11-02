@@ -291,6 +291,22 @@ check("anon cannot read photo rows", r.error !== null, r);
 r = await as("authenticated", STRANGER, "select * from public.note_images");
 check("outsider reads zero photo rows", r.error === null && r.rows!.length === 0, r);
 
+// Previews ('<photo>.thumb.jpg') follow their photo's rules.
+const thumb = (note: string, id: string) => `${note}/${id}.thumb.jpg`;
+r = await upload(JANINA, thumb(janinaEntry, P(1)));
+check("author can upload a photo's preview", r.error === null && r.rows?.length === 1, r);
+r = await upload(ME, thumb(janinaEntry, P(1)));
+check("cannot upload a preview into someone else's entry", r.error !== null, r);
+r = await upload(JANINA, `${janinaEntry}/${P(1)}.thumb.png`);
+check("previews must be .thumb.jpg", r.error !== null, r);
+r = await viewFile(ME, thumb(janinaEntry, P(1)));
+check("the other person can see a shared photo's preview", r.rows?.length === 1, r);
+r = await viewFile(STRANGER, thumb(janinaEntry, P(1)));
+check("outsider cannot see previews", r.rows?.length === 0, r);
+r = await upload(JANINA, thumb(janinaEntry, P(9)));
+r = await viewFile(ME, thumb(janinaEntry, P(9)));
+check("a preview without a listed photo stays hidden from the other person", r.rows?.length === 0, r);
+
 await addPhoto(JANINA, janinaEntry, P(2));
 await addPhoto(JANINA, janinaEntry, P(3));
 r = await addPhoto(JANINA, janinaEntry, P(4));

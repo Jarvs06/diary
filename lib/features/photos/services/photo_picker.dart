@@ -46,9 +46,11 @@ class DevicePhotoPicker implements PhotoPicker {
         );
       }
     } on PlatformException catch (e) {
-      throw InvalidContent(e.code == 'camera_access_denied'
-          ? 'Camera access is turned off for this app.'
-          : "I couldn't open your photos. Please try again.");
+      throw InvalidContent(
+        e.code == 'camera_access_denied'
+            ? 'Camera access is turned off for this app.'
+            : "I couldn't open your photos. Please try again.",
+      );
     }
 
     final photos = <PickedPhoto>[];

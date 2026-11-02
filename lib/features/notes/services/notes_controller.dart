@@ -73,6 +73,10 @@ class NotesController extends ChangeNotifier {
 
   List<NotePhoto> photosOf(String noteId) => _photoMap[noteId] ?? const [];
 
+  /// Everything you can see (shared posts and your drafts), for the export.
+  List<Note> get everything => [...feed, ...myDrafts];
+  Map<String, Participant> get people => _people;
+
   Participant? get me => _people[_meId];
   Participant? get other => _people.values.where((p) => p.id != _meId).firstOrNull;
   bool isMine(String authorId) => authorId == _meId;

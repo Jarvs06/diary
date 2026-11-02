@@ -93,11 +93,7 @@ class _PhotoPlaceholder extends StatelessWidget {
         onTap: onTap,
         child: Center(
           child: loading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -105,10 +101,7 @@ class _PhotoPlaceholder extends StatelessWidget {
                     if (label != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          label!,
-                          style: context.text.bodySmall?.copyWith(color: context.muted),
-                        ),
+                        child: Text(label!, style: context.text.bodySmall?.copyWith(color: context.muted)),
                       ),
                   ],
                 ),
@@ -125,12 +118,18 @@ class PhotoCarousel extends StatelessWidget {
     super.key,
     required this.photos,
     required this.load,
+    this.loadFull,
     this.height = 240,
     this.padding = EdgeInsets.zero,
   });
 
   final List<NotePhoto> photos;
+
+  /// Loads what the tiles show (the lighter previews in the feed).
   final PhotoLoader load;
+
+  /// Loads the full photos for the full-screen viewer; [load] if not given.
+  final PhotoLoader? loadFull;
   final double height;
 
   /// Space before the first and after the last photo. The row itself spans
@@ -142,28 +141,24 @@ class PhotoCarousel extends StatelessWidget {
   Widget build(BuildContext context) {
     if (photos.isEmpty) return const SizedBox.shrink();
     Widget tile(int i, {int cacheWidth = 600}) => ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Semantics(
-            button: true,
-            label: 'Photo ${i + 1} of ${photos.length}',
-            child: GestureDetector(
-              key: ValueKey('photo-${photos[i].id}'),
-              onTap: () => PhotoViewerScreen.open(context, photos: photos, load: load, initial: i),
-              child: DecoratedBox(
-                position: DecorationPosition.foreground,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: context.hairline),
-                ),
-                child: RemotePhoto(
-                  storagePath: photos[i].storagePath,
-                  load: load,
-                  cacheWidth: cacheWidth,
-                ),
-              ),
+      borderRadius: BorderRadius.circular(10),
+      child: Semantics(
+        button: true,
+        label: 'Photo ${i + 1} of ${photos.length}',
+        child: GestureDetector(
+          key: ValueKey('photo-${photos[i].id}'),
+          onTap: () => PhotoViewerScreen.open(context, photos: photos, load: loadFull ?? load, initial: i),
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: context.hairline),
             ),
+            child: RemotePhoto(storagePath: photos[i].storagePath, load: load, cacheWidth: cacheWidth),
           ),
-        );
+        ),
+      ),
+    );
 
     if (photos.length == 1) {
       return Padding(
@@ -197,11 +192,12 @@ class PhotoViewerScreen extends StatefulWidget {
     required List<NotePhoto> photos,
     required PhotoLoader load,
     int initial = 0,
-  }) =>
-      Navigator.of(context).push(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => PhotoViewerScreen(photos: photos, load: load, initial: initial),
-      ));
+  }) => Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => PhotoViewerScreen(photos: photos, load: load, initial: initial),
+    ),
+  );
 
   @override
   State<PhotoViewerScreen> createState() => _PhotoViewerScreenState();
