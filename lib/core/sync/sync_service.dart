@@ -42,8 +42,7 @@ class SupabaseSyncService implements SyncService {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'notes',
-          callback: (payload) =>
-              _events.add(SyncEvent(table: 'notes', noteId: payload.newRecord['id'] as String?)),
+          callback: (payload) => _events.add(SyncEvent(table: 'notes', noteId: payload.newRecord['id'] as String?)),
         )
         .onPostgresChanges(
           // New, edited and deleted replies. Deletes carry only the id, so
@@ -80,6 +79,20 @@ class SupabaseSyncService implements SyncService {
               noteId: (payload.newRecord['note_id'] ?? payload.oldRecord['note_id']) as String?,
             ),
           ),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'note_views',
+          callback: (payload) =>
+              _events.add(SyncEvent(table: 'note_views', noteId: payload.newRecord['note_id'] as String?)),
+        )
+        // A reply like only names the reply, so every open entry refreshes.
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'reply_likes',
+          callback: (_) => _events.add(const SyncEvent(table: 'reply_likes')),
         )
         .subscribe();
   }

@@ -22,6 +22,7 @@ class PostView extends StatelessWidget {
     required this.liked,
     this.full = false,
     this.isNew = false,
+    this.seen = false,
     this.onTap,
     this.onLike,
     this.onReply,
@@ -43,6 +44,9 @@ class PostView extends StatelessWidget {
 
   /// Posted by the other person since you last opened the feed.
   final bool isNew;
+
+  /// Your post, and the other person has read it.
+  final bool seen;
 
   /// Opens the entry's page (also used by "See more").
   final VoidCallback? onTap;
@@ -93,11 +97,7 @@ class PostView extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: full
-                              ? SelectableText(
-                                  body,
-                                  key: const Key('note-body'),
-                                  style: context.text.bodyLarge,
-                                )
+                              ? SelectableText(body, key: const Key('note-body'), style: context.text.bodyLarge)
                               : _ClippedText(
                                   text: body,
                                   maxLines: photos.isEmpty ? linesWithoutPhotos : linesWithPhotos,
@@ -186,9 +186,7 @@ class PostView extends StatelessWidget {
                   const PopupMenuItem(
                     key: Key('edit-note-button'),
                     value: 'edit',
-                    child: Row(
-                      children: [Icon(Icons.edit_outlined, size: 20), SizedBox(width: 12), Text('Edit')],
-                    ),
+                    child: Row(children: [Icon(Icons.edit_outlined, size: 20), SizedBox(width: 12), Text('Edit')]),
                   ),
                 if (onDelete != null)
                   PopupMenuItem(
@@ -239,8 +237,7 @@ class PostView extends StatelessWidget {
                   children: [
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 180),
-                      transitionBuilder: (child, animation) =>
-                          ScaleTransition(scale: animation, child: child),
+                      transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
                       child: Icon(
                         liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                         key: ValueKey(liked),
@@ -279,6 +276,30 @@ class PostView extends StatelessWidget {
               ),
             ),
           ),
+          const Spacer(),
+          if (note.pinned)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Icon(
+                Icons.push_pin_rounded,
+                key: ValueKey('pinned-${note.id}'),
+                size: 16,
+                color: context.muted,
+                semanticLabel: 'Pinned',
+              ),
+            ),
+          if (seen)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Row(
+                key: ValueKey('seen-${note.id}'),
+                children: [
+                  Icon(Icons.done_all_rounded, size: 16, color: context.muted),
+                  const SizedBox(width: 4),
+                  Text('Seen', style: countStyle),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -291,9 +312,7 @@ Future<bool> confirmDelete(BuildContext context) async {
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('Delete post?'),
-      content: const Text(
-        "This removes the post, its photos and its replies for both of you. It can't be undone.",
-      ),
+      content: const Text("This removes the post, its photos and its replies for both of you. It can't be undone."),
       actions: [
         TextButton(
           key: const Key('cancel-delete-button'),
@@ -338,13 +357,7 @@ class _ClippedText extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              text,
-              key: const Key('note-body'),
-              maxLines: maxLines,
-              overflow: TextOverflow.ellipsis,
-              style: style,
-            ),
+            Text(text, key: const Key('note-body'), maxLines: maxLines, overflow: TextOverflow.ellipsis, style: style),
             if (clipped)
               GestureDetector(
                 key: const Key('see-more'),

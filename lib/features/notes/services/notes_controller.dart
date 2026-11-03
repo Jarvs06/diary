@@ -68,10 +68,17 @@ class NotesController extends ChangeNotifier {
   /// Your drafts, most recently edited first. (The server never sends the
   /// other person's drafts.)
   List<Note> get myDrafts =>
-      _all.where((n) => n.isDraft && isMine(n.authorId)).toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      _all.where((n) => n.isDraft && isMine(n.authorId)).toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+  /// Entries you pinned (yours or theirs), most recent entry first.
+  List<Note> get pinned => feed.where((n) => n.pinned).toList();
 
   List<NotePhoto> photosOf(String noteId) => _photoMap[noteId] ?? const [];
+
+  Note? byId(String id) => _all.where((n) => n.id == id).firstOrNull;
+
+  /// True once the other person has read your entry.
+  bool isSeenByOther(Note note) => isMine(note.authorId) && note.seenBy.any((id) => id != _meId);
 
   /// Everything you can see (shared posts and your drafts), for the export.
   List<Note> get everything => [...feed, ...myDrafts];
@@ -132,7 +139,9 @@ class NotesController extends ChangeNotifier {
   /// Puts a just-saved entry in place without waiting for a refresh.
   void applySaved(Note note) {
     final old = _all.where((n) => n.id == note.id).firstOrNull;
-    final merged = old == null ? note : note.copyWith(replyCount: old.replyCount, likedBy: old.likedBy);
+    final merged = old == null
+        ? note
+        : note.copyWith(replyCount: old.replyCount, likedBy: old.likedBy, seenBy: old.seenBy, pinned: old.pinned);
     _all = [merged, ..._all.where((n) => n.id != note.id)];
     _notify();
   }
@@ -148,6 +157,36 @@ class NotesController extends ChangeNotifier {
     );
     try {
       await _notes.setLiked(note.id, liked: like);
+      return null;
+    } on AppFailure catch (f) {
+      _replace(current);
+      return f;
+    }
+  }
+
+  final _markedSeen = <String>{};
+
+  /// Records that you've read the other person's shared entry. Once per
+  /// entry; best effort (it's only for their "Seen").
+  Future<void> markSeen(Note note) async {
+    final me = _meId;
+    if (me == null || isMine(note.authorId) || note.isDraft || note.seenBy.contains(me)) return;
+    if (!_markedSeen.add(note.id)) return;
+    try {
+      await _notes.markSeen(note.id);
+      final current = byId(note.id);
+      if (current != null) _replace(current.copyWith(seenBy: [...current.seenBy, me]));
+    } on AppFailure {
+      _markedSeen.remove(note.id);
+    }
+  }
+
+  /// Pins or unpins right away; puts it back if the server says no.
+  Future<AppFailure?> togglePin(Note note) async {
+    final current = byId(note.id) ?? note;
+    _replace(current.copyWith(pinned: !current.pinned));
+    try {
+      await _notes.setPinned(note.id, pinned: !current.pinned);
       return null;
     } on AppFailure catch (f) {
       _replace(current);

@@ -429,6 +429,62 @@ r = await as("authenticated", JANINA, "delete from public.replies where id = $1 
 row = await one("select count(*)::int as c from public.replies where id = $1", [R(2)]);
 check("deleting a reply deletes its answers", r.rows?.length === 1 && row.c === 0, { r, row });
 
+// ---------------------------------------------------------------- reply likes, seen, pins, cleanup
+r = await as("authenticated", JANINA, "insert into public.replies (id, note_id, body) values ($1, $2, 'like me') returning id", [R(6), letterId]);
+r = await as("authenticated", ME, "insert into public.reply_likes (reply_id) values ($1) returning user_id", [R(6)]);
+check("you can like a reply", r.rows?.[0]?.user_id === ME, r);
+r = await as("authenticated", ME, "insert into public.reply_likes (reply_id) values ($1)", [R(6)]);
+check("one like per person per reply", r.error !== null, r);
+r = await as("authenticated", ME, "insert into public.reply_likes (reply_id, user_id) values ($1, $2)", [R(6), JANINA]);
+check("you cannot like as the other person", r.error !== null, r);
+r = await as("authenticated", STRANGER, "insert into public.reply_likes (reply_id) values ($1)", [R(6)]);
+check("an outsider cannot like a reply", r.error !== null, r);
+r = await as("authenticated", JANINA, "select user_id from public.reply_likes where reply_id = $1", [R(6)]);
+check("both see reply likes", r.rows?.length === 1, r);
+r = await as("authenticated", JANINA, "delete from public.reply_likes returning user_id");
+check("you cannot remove someone else's reply like", r.rows?.length === 0, r);
+r = await as("authenticated", ME, "delete from public.reply_likes returning user_id");
+check("you can remove your own reply like", r.rows?.length === 1, r);
+
+r = await as("authenticated", JANINA, "insert into public.notes (body, status) values ('secret', 'draft') returning id");
+const freshDraft = r.rows![0].id;
+r = await as("authenticated", JANINA, "insert into public.note_views (note_id) values ($1) returning user_id", [letterId]);
+check("Janina records seeing Jarvey's post", r.rows?.[0]?.user_id === JANINA, r);
+r = await as("authenticated", ME, "select user_id from public.note_views where note_id = $1", [letterId]);
+check("the author sees who has seen it", r.rows?.length === 1, r);
+r = await as("authenticated", ME, "insert into public.note_views (note_id) values ($1)", [letterId]);
+check("you cannot mark your own post seen", r.error !== null, r);
+r = await as("authenticated", ME, "insert into public.note_views (note_id) values ($1)", [freshDraft]);
+check("you cannot mark a draft seen", r.error !== null, r);
+r = await as("authenticated", JANINA, "delete from public.note_views returning note_id");
+check("seen can't be taken back", r.error !== null || r.rows?.length === 0, r);
+
+r = await as("authenticated", JANINA, "insert into public.note_pins (note_id) values ($1) returning note_id", [letterId]);
+check("you can pin the other person's post", r.rows?.length === 1, r);
+r = await as("authenticated", ME, "select * from public.note_pins");
+check("pins are private to you", r.error === null && r.rows!.length === 0, r);
+r = await as("authenticated", ME, "insert into public.note_pins (note_id) values ($1)", [freshDraft]);
+check("you cannot pin someone else's draft", r.error !== null, r);
+r = await as("authenticated", JANINA, "delete from public.note_pins returning note_id");
+check("you can unpin", r.rows?.length === 1, r);
+
+// A photo answer left behind when its parent reply is deleted.
+await as("authenticated", JANINA, "insert into public.replies (id, note_id, body) values ($1, $2, 'parent')", [R(7), letterId]);
+await as("authenticated", ME,
+  "insert into public.replies (id, note_id, body, parent_id, image_path) values ($1, $2, '', $3, $4)", [R(8), letterId, R(7), `${R(8)}.jpg`]);
+await replyUpload(ME, `${R(8)}.jpg`);
+r = await as("authenticated", JANINA, "select * from public.orphan_reply_images()");
+check("nothing is left over while the reply exists", r.rows?.length === 0, r);
+r = await as("authenticated", JANINA, "delete from storage.objects where bucket_id = 'reply-images' returning name");
+check("a reply photo in use can't be removed by the other person", r.rows?.length === 0, r);
+await as("authenticated", JANINA, "delete from public.replies where id = $1", [R(7)]);
+r = await as("authenticated", JANINA, "select * from public.orphan_reply_images() as name");
+check("the answer's photo is listed as left over", r.rows?.length === 1 && r.rows[0].name === `${R(8)}.jpg`, r);
+r = await as("authenticated", STRANGER, "select * from public.orphan_reply_images()");
+check("outsiders see no leftovers", r.error !== null || r.rows?.length === 0, r);
+r = await as("authenticated", JANINA, "delete from storage.objects where bucket_id = 'reply-images' returning name");
+check("either person can remove a left-over reply photo", r.rows?.length === 1, r);
+
 // ---------------------------------------------------------------- app releases
 await one("insert into public.app_releases (version_code, version_name, apk_url) values (2, '1.0.1', 'https://example.com/a.apk')");
 r = await as("authenticated", JANINA, "select version_code, apk_url from public.app_releases");

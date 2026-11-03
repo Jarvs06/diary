@@ -120,6 +120,8 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
   /// A new reply from the other person is followed only if you're already
   /// reading the end of the conversation.
   void _onThreadChanged() {
+    final loaded = _thread.note;
+    if (loaded != null) unawaited(_people.markSeen(loaded));
     if (_focusReplyOnLoad && _thread.note != null && !_thread.note!.isDraft) {
       _focusReplyOnLoad = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -217,6 +219,19 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
     _notice(await _thread.deleteReply(reply));
   }
 
+  Future<void> _togglePin(Note note) async {
+    final pinned = !(_people.byId(note.id)?.pinned ?? note.pinned);
+    _notice(await _people.togglePin(_people.byId(note.id) ?? note));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(pinned ? 'Pinned to your profile' : 'Unpinned')));
+  }
+
+  Future<void> _likeReply(Reply reply) async {
+    _notice(await _thread.toggleReplyLike(reply, _people.meId));
+  }
+
   void _notice(AppFailure? failure) {
     if (failure == null || !mounted) return;
     ScaffoldMessenger.of(context)
@@ -238,6 +253,24 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('Post'),
         shape: Border(bottom: BorderSide(color: context.hairline, width: 0.6)),
+        actions: [
+          ListenableBuilder(
+            listenable: Listenable.merge([_thread, _people]),
+            builder: (context, _) {
+              final note = _thread.note;
+              if (note == null || note.isDraft) return const SizedBox.shrink();
+              final pinned = _people.byId(note.id)?.pinned ?? note.pinned;
+              return IconButton(
+                key: const Key('pin-button'),
+                tooltip: pinned ? 'Unpin' : 'Pin to your profile',
+                isSelected: pinned,
+                onPressed: () => _togglePin(note),
+                icon: const Icon(Icons.push_pin_outlined),
+                selectedIcon: const Icon(Icons.push_pin_rounded),
+              );
+            },
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: _thread,
@@ -270,6 +303,7 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
                           loadPhoto: _deps.photosRepository.loadPhoto,
                           loadPreview: _deps.photosRepository.loadPreview,
                           full: true,
+                          seen: _people.isSeenByOther(note),
                           liked: note.isLikedBy(_people.meId),
                           onLike: note.isDraft ? null : _like,
                           onReply: note.isDraft ? null : _replyFocus.requestFocus,
@@ -318,6 +352,8 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
       isMine: mine,
       isAnswer: reply.parentId != null,
       loadPhoto: _deps.repliesRepository.loadPhoto,
+      liked: reply.isLikedBy(_people.meId),
+      onLike: () => _likeReply(reply),
       onReply: () => _answer(reply),
       onEdit: mine ? () => _editReply(reply) : null,
       onDelete: mine ? () => _deleteReply(reply) : null,

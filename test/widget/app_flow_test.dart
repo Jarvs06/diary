@@ -329,6 +329,9 @@ void main() {
       expect(of(ActivityKind.post, '').body, 'Photos');
       expect(of(ActivityKind.reply, 'Aww').title, 'Janina replied');
       expect(of(ActivityKind.like, 'For you').title, 'Janina liked your post');
+      expect(of(ActivityKind.answer, 'Yes').title, 'Janina replied to you');
+      expect(of(ActivityKind.replyLike, 'Thanks').title, 'Janina liked your reply');
+      expect(of(ActivityKind.replyLike, '').body, 'Photo');
     });
 
     testWidgets('profile offers to allow background running when Android restricts it', (tester) async {
@@ -949,6 +952,92 @@ void main() {
       await tester.pumpAndSettle();
       await tapKey(tester, const Key('save-photo-button'));
       expect(find.text('Allow access to your photos to save it.'), findsOneWidget);
+    });
+  });
+
+  group('reply likes, seen, pins, search', () {
+    testWidgets('you can like a reply, and unlike it', (tester) async {
+      world.auth.userId = meId;
+      world.replies.store['r1'] = reply(); // from Janina
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, const ValueKey('like-reply-r1'));
+      expect(world.replies.likes['r1'], {meId});
+      expect(find.byKey(const ValueKey('reply-like-count-r1')), findsOneWidget);
+      await tapKey(tester, const ValueKey('like-reply-r1'));
+      expect(world.replies.likes['r1'], isEmpty);
+      expect(find.byKey(const ValueKey('reply-like-count-r1')), findsNothing);
+    });
+
+    testWidgets("reading the other person's post marks it seen", (tester) async {
+      world.auth.userId = janinaId; // n1 is Jarvey's
+      await start(tester);
+      await tester.pumpAndSettle();
+      expect(world.notes.views['n1'], {janinaId});
+    });
+
+    testWidgets('the author sees "Seen" once the other person has read it', (tester) async {
+      world.auth.userId = meId;
+      world.notes.views['n1'] = {janinaId};
+      await start(tester);
+      expect(find.byKey(const ValueKey('seen-n1')), findsOneWidget);
+      expect(world.notes.views['n1'], {janinaId}); // your own post isn't marked
+    });
+
+    testWidgets('no "Seen" before the other person has read it', (tester) async {
+      world.auth.userId = meId;
+      await start(tester);
+      expect(find.byKey(const ValueKey('seen-n1')), findsNothing);
+    });
+
+    testWidgets('a pinned post shows under Pinned on the profile', (tester) async {
+      world = FakeWorld(signedInAs: janinaId, notes: [note()]);
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, const Key('pin-button'));
+      expect(world.notes.pins[janinaId], {'n1'});
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pinned-n1')), findsOneWidget);
+      await tapKey(tester, const Key('nav-profile'));
+      await tapKey(tester, const Key('tab-pinned'));
+      expect(find.byKey(const ValueKey('post-n1')), findsOneWidget);
+    });
+
+    testWidgets('search finds posts by any of their words', (tester) async {
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [
+          note(id: 'a', body: 'We went to the beach today.'),
+          note(id: 'b', authorId: janinaId, body: 'Rainy day at home.'),
+        ],
+      );
+      await start(tester);
+      await tapKey(tester, const Key('search-button'));
+      await tester.enterText(find.byKey(const Key('search-field')), 'BEACH');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-result-a')), findsOneWidget);
+      expect(find.byKey(const ValueKey('search-result-b')), findsNothing);
+      await tester.enterText(find.byKey(const Key('search-field')), 'nothing like this');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('No posts with'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('search-field')), 'rainy');
+      await tester.pumpAndSettle();
+      await tapKey(tester, const ValueKey('search-result-b'));
+      expect(find.text('Post'), findsOneWidget);
+    });
+
+    testWidgets("deleting a post cleans up its replies' photos", (tester) async {
+      world.auth.userId = meId;
+      world.replies.addFrom(janinaId, 'n1', '', withPhoto: true);
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, const ValueKey('post-menu-n1'));
+      await tapKey(tester, const Key('delete-note-button'));
+      await tapKey(tester, const Key('confirm-delete-button'));
+      world.replies.store.clear(); // the database's cascade
+      await tester.pumpAndSettle();
+      expect(world.replies.cleanUps, greaterThan(0));
     });
   });
 

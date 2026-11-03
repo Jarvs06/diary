@@ -23,6 +23,8 @@ class Note {
     this.publishedAt,
     this.replyCount = 0,
     this.likedBy = const [],
+    this.seenBy = const [],
+    this.pinned = false,
   });
 
   final String id;
@@ -47,11 +49,18 @@ class Note {
   /// Who liked it (at most the two of you), from the `note_likes` embed.
   final List<String> likedBy;
 
+  /// Who has read it (never its author), from the `note_views` embed.
+  final List<String> seenBy;
+
+  /// Pinned by the signed-in person (pins are private, so the `note_pins`
+  /// embed only ever holds your own).
+  final bool pinned;
+
   int get likeCount => likedBy.length;
   bool isLikedBy(String? userId) => userId != null && likedBy.contains(userId);
 
   static const columns =
-      'id, author_id, title, body, status, entry_date, version, created_at, updated_at, published_at, last_activity_at, replies(count), note_likes(user_id)';
+      'id, author_id, title, body, status, entry_date, version, created_at, updated_at, published_at, last_activity_at, replies(count), note_likes(user_id), note_views(user_id), note_pins(user_id)';
 
   factory Note.fromJson(Map<String, dynamic> json) => Note(
     id: json['id'] as String,
@@ -72,6 +81,11 @@ class Note {
       for (final like in json['note_likes'] as List? ?? const [])
         if (like is Map && like['user_id'] is String) like['user_id'] as String,
     ],
+    seenBy: [
+      for (final view in json['note_views'] as List? ?? const [])
+        if (view is Map && view['user_id'] is String) view['user_id'] as String,
+    ],
+    pinned: (json['note_pins'] as List? ?? const []).isNotEmpty,
   );
 
   /// The same shape [Note.fromJson] reads; used for the offline copy.
@@ -92,6 +106,12 @@ class Note {
     ],
     'note_likes': [
       for (final id in likedBy) {'user_id': id},
+    ],
+    'note_views': [
+      for (final id in seenBy) {'user_id': id},
+    ],
+    'note_pins': [
+      if (pinned) {'user_id': ''},
     ],
   };
 
@@ -131,7 +151,13 @@ class Note {
       .where((p) => p.trim().isNotEmpty)
       .toList(growable: false);
 
-  Note copyWith({DateTime? lastActivityAt, int? replyCount, List<String>? likedBy}) => Note(
+  Note copyWith({
+    DateTime? lastActivityAt,
+    int? replyCount,
+    List<String>? likedBy,
+    List<String>? seenBy,
+    bool? pinned,
+  }) => Note(
     id: id,
     authorId: authorId,
     title: title,
@@ -145,5 +171,7 @@ class Note {
     publishedAt: publishedAt,
     replyCount: replyCount ?? this.replyCount,
     likedBy: likedBy ?? this.likedBy,
+    seenBy: seenBy ?? this.seenBy,
+    pinned: pinned ?? this.pinned,
   );
 }

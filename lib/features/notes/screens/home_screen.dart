@@ -18,6 +18,7 @@ import '../models/note.dart';
 import '../services/notes_controller.dart';
 import '../widgets/post_view.dart';
 import 'calendar_screen.dart';
+import 'search_screen.dart';
 import 'compose_screen.dart';
 import 'post_screen.dart';
 
@@ -77,14 +78,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _deps.notifications.requestPermission();
     _tapSub = _deps.notifications.taps.listen(_openById);
     _deps.syncService.start();
-    _syncSub = _deps.syncService.events.listen((_) {
+    _syncSub = _deps.syncService.events.listen((event) {
+      // Reply likes only matter on an open entry.
+      if (event.table == 'reply_likes') return;
       // Bursts of changes (e.g. share + photos) collapse into one refresh.
       _syncDebounce?.cancel();
       _syncDebounce = Timer(const Duration(milliseconds: 400), () => _refresh());
     });
-    _signedOutSub = _deps.authSession.onSignedOut.listen(
-      (_) => _goToPasscode(notice: const SessionExpired()),
-    );
+    _signedOutSub = _deps.authSession.onSignedOut.listen((_) => _goToPasscode(notice: const SessionExpired()));
   }
 
   @override
@@ -266,9 +267,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  value.$2 == 0 ? 'Preparing your diary…' : 'Adding photos ${value.$1} of ${value.$2}…',
-                ),
+                child: Text(value.$2 == 0 ? 'Preparing your diary…' : 'Adding photos ${value.$1} of ${value.$2}…'),
               ),
             ],
           ),
@@ -369,8 +368,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _post(Note note) {
     final mine = _notes.isMine(note.authorId);
     final since = _newSince;
+    // Shown on screen counts as read, for the author's "Seen".
+    if (!mine && !note.isDraft) unawaited(_notes.markSeen(note));
     return PostView(
       note: note,
+      seen: _notes.isSeenByOther(note),
       isNew: since != null && !mine && note.postedAt.isAfter(since) && !_opened.contains(note.id),
       authorName: _notes.nameOf(note.authorId),
       photos: _notes.photosOf(note.id),
@@ -399,6 +401,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _notice(failure);
       return false;
     }
+    // Photos in its replies are left over now.
+    unawaited(_deps.repliesRepository.cleanUpPhotos());
     if (mounted) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -436,11 +440,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const BrandTitle(),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: IconButton(
-                      key: const Key('calendar-button'),
-                      tooltip: 'Calendar',
-                      icon: const Icon(Icons.calendar_month_outlined),
-                      onPressed: _openCalendar,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          key: const Key('search-button'),
+                          tooltip: 'Search',
+                          icon: const Icon(Icons.search_rounded),
+                          onPressed: _openSearch,
+                        ),
+                        IconButton(
+                          key: const Key('calendar-button'),
+                          tooltip: 'Calendar',
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          onPressed: _openCalendar,
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -473,6 +488,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _openSearch() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => SearchScreen(
+          notes: _notes,
+          onOpen: (note) => note.isDraft ? _compose(existing: note) : _open(note),
+        ),
+      ),
+    );
+  }
+
   void _openCalendar() {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -485,12 +511,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Note> _onThisDay(List<Note> feed) {
     final today = DateTime.now();
     return feed
-        .where(
-          (n) =>
-              n.entryDate.month == today.month &&
-              n.entryDate.day == today.day &&
-              n.entryDate.year < today.year,
-        )
+        .where((n) => n.entryDate.month == today.month && n.entryDate.day == today.day && n.entryDate.year < today.year)
         .toList();
   }
 
@@ -499,10 +520,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       key: const Key('on-this-day'),
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: BoxDecoration(color: context.colors.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -551,10 +569,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       key: const Key('update-banner'),
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       padding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: context.colors.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           Expanded(
@@ -639,7 +654,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: NestedScrollView(
         key: const Key('profile'),
         headerSliverBuilder: (context, _) => [
@@ -707,10 +722,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 tabBar: TabBar(
                   tabs: [
                     const Tab(key: Key('tab-entries'), text: 'Posts'),
-                    Tab(
-                      key: const Key('tab-drafts'),
-                      text: drafts.isEmpty ? 'Drafts' : 'Drafts (${drafts.length})',
-                    ),
+                    const Tab(key: Key('tab-pinned'), text: 'Pinned'),
+                    Tab(key: const Key('tab-drafts'), text: drafts.isEmpty ? 'Drafts' : 'Drafts (${drafts.length})'),
                   ],
                 ),
               ),
@@ -720,6 +733,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         body: TabBarView(
           children: [
             list('profile-entries', entries, "You haven't shared anything yet."),
+            list('profile-pinned', _notes.pinned, 'Nothing pinned yet.\nOpen a post and tap the pin to keep it here.'),
             list('profile-drafts', drafts, 'No drafts.'),
           ],
         ),
@@ -832,11 +846,7 @@ class _BottomBar extends StatelessWidget {
                 decoration: ShapeDecoration(
                   shape: const StadiumBorder(),
                   shadows: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, 8)),
                   ],
                 ),
                 child: ClipPath(

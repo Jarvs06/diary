@@ -278,6 +278,11 @@ avatar has its own colour, since both names start with J.
   If sending fails, your text stays in the box and it says *Not sent*. ··· on
   your own reply → Edit / Delete. The image icon adds one photo (a photo
   alone is fine too).
+- **Like a reply:** the small heart under it. **Pin:** the pin at the top of
+  a post keeps it under **Pinned** on your profile (only you see your pins).
+- **Seen:** your post shows *Seen* once the other person has read it (shown in
+  their feed or opened).
+- **Search:** the magnifier at the top of the feed finds posts by any words.
 - **Answer a reply:** tap **Reply** under it. Answers sit indented under that
   reply behind "View n replies"; answering an answer keeps it in the same
   group and starts it with "@name".
@@ -332,9 +337,9 @@ phones.
 ## 5. Tests
 
 ```bash
-flutter test                                          # 143 unit + widget tests
+flutter test                                          # 152 unit + widget tests
 deno test supabase/functions/_shared/crypto_test.ts   # helper crypto
-deno run -A supabase/tests/migrations_test.ts .       # 128 RLS / database / storage checks
+deno run -A supabase/tests/migrations_test.ts .       # 149 RLS / database / storage checks
 ```
 
 The database tests run the real migrations in PGlite (Postgres in WebAssembly)

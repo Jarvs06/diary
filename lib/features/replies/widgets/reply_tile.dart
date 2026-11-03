@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/dates.dart';
@@ -16,6 +17,8 @@ class ReplyTile extends StatelessWidget {
     required this.isMine,
     required this.loadPhoto,
     this.isAnswer = false,
+    this.liked = false,
+    this.onLike,
     this.onReply,
     this.onEdit,
     this.onDelete,
@@ -26,6 +29,10 @@ class ReplyTile extends StatelessWidget {
   final bool isMine;
   final PhotoLoader loadPhoto;
   final bool isAnswer;
+
+  /// Whether the signed-in person liked it, and the heart under the text.
+  final bool liked;
+  final VoidCallback? onLike;
 
   /// The "Reply" button under the text.
   final VoidCallback? onReply;
@@ -79,18 +86,27 @@ class ReplyTile extends StatelessWidget {
                     const SizedBox(height: 8),
                     _ReplyPhoto(path: path, load: loadPhoto),
                   ],
-                  if (onReply != null)
-                    TextButton(
-                      key: ValueKey('reply-to-${reply.id}'),
-                      onPressed: onReply,
-                      style: TextButton.styleFrom(
-                        foregroundColor: context.muted,
-                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-                        minimumSize: const Size(0, 32),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        textStyle: context.text.labelLarge,
+                  if (onLike != null || onReply != null)
+                    Transform.translate(
+                      offset: const Offset(-8, 0), // line the heart up with the text
+                      child: Row(
+                        children: [
+                          if (onLike != null) _likeButton(context),
+                          if (onReply != null)
+                            TextButton(
+                              key: ValueKey('reply-to-${reply.id}'),
+                              onPressed: onReply,
+                              style: TextButton.styleFrom(
+                                foregroundColor: context.muted,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: const Size(0, 32),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                textStyle: context.text.labelLarge,
+                              ),
+                              child: const Text('Reply'),
+                            ),
+                        ],
                       ),
-                      child: const Text('Reply'),
                     )
                   else
                     const SizedBox(height: 6),
@@ -102,6 +118,40 @@ class ReplyTile extends StatelessWidget {
       ),
     );
   }
+
+  Widget _likeButton(BuildContext context) => InkResponse(
+    key: ValueKey('like-reply-${reply.id}'),
+    radius: 18,
+    onTap: () {
+      HapticFeedback.lightImpact();
+      onLike!();
+    },
+    child: Semantics(
+      button: true,
+      toggled: liked,
+      label: liked ? 'Unlike reply' : 'Like reply',
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          children: [
+            Icon(
+              liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              size: 17,
+              color: liked ? AppPalette.like : context.muted,
+            ),
+            if (reply.likedBy.isNotEmpty) ...[
+              const SizedBox(width: 4),
+              Text(
+                '${reply.likedBy.length}',
+                key: ValueKey('reply-like-count-${reply.id}'),
+                style: context.text.bodyMedium?.copyWith(color: context.muted),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
 
   Widget _menu(BuildContext context) => SizedBox(
     height: 24,

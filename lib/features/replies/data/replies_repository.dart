@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/network/backend_client.dart';
+import '../../../core/storage/photo_cache.dart';
 import '../../photos/models/photo.dart';
 import '../../photos/services/photo_preview.dart';
 import '../models/reply.dart';
@@ -35,10 +36,21 @@ abstract interface class RepliesRepository {
 
   /// The bytes of a reply's photo (cached; photos never change).
   Future<Uint8List> loadPhoto(String imagePath);
+
+  /// Likes or unlikes a reply as yourself.
+  Future<void> setLiked(String replyId, {required bool liked});
+
+  /// Removes photo files whose reply is gone (deleting a post or a reply
+  /// also deletes the replies under it). Best effort.
+  Future<void> cleanUpPhotos();
 }
 
 class SupabaseRepliesRepository implements RepliesRepository {
-  SupabaseRepliesRepository(this._client, {this.timeout = const Duration(seconds: 20)});
+  SupabaseRepliesRepository(
+    this._client, {
+    this.timeout = const Duration(seconds: 20),
+    PhotoCache diskCache = const NoPhotoCache(),
+  }) : _disk = diskCache;
 
   static const bucket = 'reply-images';
   static const _cacheSize = 20;
@@ -47,6 +59,7 @@ class SupabaseRepliesRepository implements RepliesRepository {
   final Duration timeout;
   // Insertion-ordered, so the first key is the least recently used.
   final _cache = <String, Future<Uint8List>>{};
+  final PhotoCache _disk;
 
   StorageFileApi get _files => _client.storage.from(bucket);
 
@@ -133,6 +146,7 @@ class SupabaseRepliesRepository implements RepliesRepository {
           }
         }
         _cache[imagePath] = Future.value(jpeg);
+        unawaited(_disk.write('reply/$imagePath', jpeg));
       }
       return reply;
     } catch (e) {
@@ -169,14 +183,46 @@ class SupabaseRepliesRepository implements RepliesRepository {
     } catch (e) {
       throw failureFromData(e);
     }
-    final path = reply.imagePath;
-    if (path == null) return;
-    _cache.remove(path);
-    // Once the reply is gone nobody else can see the file, so a failed
-    // cleanup only leaves an invisible orphan behind.
+    if (reply.imagePath case final path?) {
+      _cache.remove(path);
+      unawaited(_disk.remove('reply/$path'));
+    }
+    // Its photo, and those of its answers, are now left over.
+    await cleanUpPhotos();
+  }
+
+  @override
+  Future<void> cleanUpPhotos() async {
     try {
-      await _files.remove([path]).timeout(timeout);
-    } catch (_) {}
+      final names = await _client.rpc<List<dynamic>>('orphan_reply_images').timeout(timeout);
+      if (names.isEmpty) return;
+      final paths = [for (final n in names) n is Map ? n['orphan_reply_images'] as String : n as String];
+      for (final path in paths) {
+        _cache.remove(path);
+        unawaited(_disk.remove('reply/$path'));
+      }
+      await _files.remove(paths).timeout(timeout);
+    } catch (_) {
+      // A file left behind can't be seen by anyone; the next cleanup retries.
+    }
+  }
+
+  @override
+  Future<void> setLiked(String replyId, {required bool liked}) async {
+    try {
+      if (liked) {
+        try {
+          await _client.from('reply_likes').insert({'reply_id': replyId}).timeout(timeout);
+        } on PostgrestException catch (e) {
+          if (e.code != '23505') rethrow; // already liked
+        }
+      } else {
+        // RLS limits this to your own like.
+        await _client.from('reply_likes').delete().eq('reply_id', replyId).timeout(timeout);
+      }
+    } catch (e) {
+      throw failureFromData(e);
+    }
   }
 
   @override
@@ -184,10 +230,17 @@ class SupabaseRepliesRepository implements RepliesRepository {
     final cached = _cache.remove(imagePath);
     if (cached != null) return _cache[imagePath] = cached;
 
-    final future = _files
-        .download(imagePath)
-        .timeout(const Duration(minutes: 1))
-        .catchError((Object e) => throw failureFromData(e));
+    final future = () async {
+      final saved = await _disk.read('reply/$imagePath');
+      if (saved != null) return saved;
+      try {
+        final bytes = await _files.download(imagePath).timeout(const Duration(minutes: 1));
+        unawaited(_disk.write('reply/$imagePath', bytes));
+        return bytes;
+      } catch (e) {
+        throw failureFromData(e);
+      }
+    }();
     _cache[imagePath] = future;
     if (_cache.length > _cacheSize) _cache.remove(_cache.keys.first);
     // A failed download isn't cached, so it can be retried.

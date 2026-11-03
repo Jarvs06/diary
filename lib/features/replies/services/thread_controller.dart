@@ -150,6 +150,28 @@ class ThreadController extends ChangeNotifier {
     }
   }
 
+  /// Likes or unlikes a reply right away; reverts if the server says no.
+  Future<AppFailure?> toggleReplyLike(Reply reply, String? meId) async {
+    if (meId == null) return null;
+    final current = _thread.where((r) => r.id == reply.id).firstOrNull ?? reply;
+    final like = !current.isLikedBy(meId);
+    _swap(
+      current.copyWith(likedBy: like ? [...current.likedBy, meId] : current.likedBy.where((id) => id != meId).toList()),
+    );
+    try {
+      await _replies.setLiked(reply.id, liked: like);
+      return null;
+    } on AppFailure catch (f) {
+      _swap(current);
+      return f;
+    }
+  }
+
+  void _swap(Reply reply) {
+    _thread = [for (final r in _thread) r.id == reply.id ? reply : r];
+    _notify();
+  }
+
   /// Changes the text of your own reply. Returns the failure, if any.
   Future<AppFailure?> editReply(Reply reply, String text) async {
     final body = text.trim();

@@ -191,7 +191,35 @@ class FakeNotesRepository implements NotesRepository {
   final likes = <String, Set<String>>{};
   final deleted = <String>[];
 
-  Note _withCount(Note n) => n.copyWith(replyCount: countReplies(n.id), likedBy: (likes[n.id] ?? const {}).toList());
+  /// Who has seen each entry, like `note_views`.
+  final views = <String, Set<String>>{};
+
+  /// Pins per person, like `note_pins`.
+  final pins = <String, Set<String>>{};
+
+  Note _withCount(Note n) => n.copyWith(
+    replyCount: countReplies(n.id),
+    likedBy: (likes[n.id] ?? const {}).toList(),
+    seenBy: (views[n.id] ?? const {}).toList(),
+    pinned: pins[auth.userId]?.contains(n.id) ?? false,
+  );
+
+  @override
+  Future<void> markSeen(String noteId) async {
+    if (nextFailure != null) throw nextFailure!;
+    final n = store[noteId];
+    if (n == null || n.status != NoteStatus.published || n.authorId == auth.userId) throw const NotAllowed();
+    views.putIfAbsent(noteId, () => {}).add(auth.userId!);
+  }
+
+  @override
+  Future<void> setPinned(String noteId, {required bool pinned}) async {
+    if (nextFailure != null) throw nextFailure!;
+    final n = store[noteId];
+    if (n == null || !_visible(n)) throw const NotAllowed();
+    final set = pins.putIfAbsent(auth.userId!, () => {});
+    pinned ? set.add(noteId) : set.remove(noteId);
+  }
 
   @override
   Future<void> setLiked(String noteId, {required bool liked}) async {
@@ -323,7 +351,8 @@ class FakeRepliesRepository implements RepliesRepository {
   @override
   Future<List<Reply>> fetchReplies(String noteId) async {
     if (nextFailure != null) throw nextFailure!;
-    return store.values.where((r) => r.noteId == noteId).toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return store.values.where((r) => r.noteId == noteId).map(_withLikes).toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
   /// Reply photos on the "server", by image path.
@@ -361,6 +390,27 @@ class FakeRepliesRepository implements RepliesRepository {
     );
   }
 
+  /// Likes per reply, like `reply_likes`.
+  final likes = <String, Set<String>>{};
+  int cleanUps = 0;
+
+  @override
+  Future<void> setLiked(String replyId, {required bool liked}) async {
+    if (nextFailure != null) throw nextFailure!;
+    if (!store.containsKey(replyId)) throw const NotAllowed();
+    final set = likes.putIfAbsent(replyId, () => {});
+    liked ? set.add(auth.userId!) : set.remove(auth.userId);
+  }
+
+  @override
+  Future<void> cleanUpPhotos() async {
+    cleanUps++;
+    final inUse = {for (final r in store.values) r.imagePath};
+    photoFiles.removeWhere((path, _) => !inUse.contains(path));
+  }
+
+  Reply _withLikes(Reply r) => r.copyWith(likedBy: (likes[r.id] ?? const {}).toList());
+
   @override
   Future<Uint8List> loadPhoto(String imagePath) async {
     final bytes = photoFiles[imagePath];
@@ -389,7 +439,7 @@ class FakeRepliesRepository implements RepliesRepository {
     final current = store[reply.id];
     if (current != null && current.authorId != auth.userId) throw const NotAllowed();
     store.removeWhere((id, r) => id == reply.id || r.parentId == reply.id);
-    photoFiles.remove(reply.imagePath);
+    await cleanUpPhotos();
   }
 
   /// Simulates the other person replying from their phone.

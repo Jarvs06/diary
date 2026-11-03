@@ -41,7 +41,9 @@ class SupabaseActivityChecker implements ActivityChecker {
           .limit(10),
       _client
           .from('replies')
-          .select('id, note_id, author_id, body, created_at, image_path')
+          .select(
+            'id, note_id, author_id, body, created_at, image_path, parent:replies!replies_parent_id_fkey(author_id)',
+          )
           .neq('author_id', me)
           .gt('created_at', since)
           .order('created_at')
@@ -56,6 +58,15 @@ class SupabaseActivityChecker implements ActivityChecker {
           .order('created_at')
           .limit(10),
       _client.from('participants').select('id, display_name'),
+      // Likes from the other person on your own replies.
+      _client
+          .from('reply_likes')
+          .select('reply_id, user_id, created_at, replies!inner(note_id, author_id, body)')
+          .neq('user_id', me)
+          .eq('replies.author_id', me)
+          .gt('created_at', since)
+          .order('created_at')
+          .limit(10),
     ]).timeout(timeout);
 
     final names = {for (final p in results[3]) p['id'] as String: (p['display_name'] as String?) ?? 'Someone'};
@@ -77,7 +88,7 @@ class SupabaseActivityChecker implements ActivityChecker {
         ),
       for (final r in results[1])
         NewActivity(
-          kind: ActivityKind.reply,
+          kind: (r['parent'] as Map?)?['author_id'] == me ? ActivityKind.answer : ActivityKind.reply,
           key: 'reply-${r['id']}',
           noteId: r['note_id'] as String,
           actorName: name(r['author_id']),
@@ -93,6 +104,15 @@ class SupabaseActivityChecker implements ActivityChecker {
           noteId: r['note_id'] as String,
           actorName: name(r['user_id']),
           text: entryText(r['notes'] as Map<String, dynamic>),
+          at: DateTime.parse(r['created_at'] as String),
+        ),
+      for (final r in results[4])
+        NewActivity(
+          kind: ActivityKind.replyLike,
+          key: 'reply-like-${r['reply_id']}-${r['user_id']}',
+          noteId: (r['replies'] as Map<String, dynamic>)['note_id'] as String,
+          actorName: name(r['user_id']),
+          text: (r['replies'] as Map<String, dynamic>)['body'] as String? ?? '',
           at: DateTime.parse(r['created_at'] as String),
         ),
     ]..sort((a, b) => a.at.compareTo(b.at));

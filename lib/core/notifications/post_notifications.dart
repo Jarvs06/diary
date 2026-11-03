@@ -4,7 +4,17 @@ import 'dart:ui' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-enum ActivityKind { post, reply, like }
+enum ActivityKind {
+  post,
+  reply,
+
+  /// An answer to one of your replies.
+  answer,
+  like,
+
+  /// A like on one of your replies.
+  replyLike,
+}
 
 /// Something the other person did that this phone hasn't announced yet:
 /// shared an entry, replied, or liked one of your entries.
@@ -39,12 +49,20 @@ class NewActivity {
   }
 
   String get title => switch (kind) {
-        ActivityKind.post => '$actorName shared a new post',
-        ActivityKind.reply => '$actorName replied',
-        ActivityKind.like => '$actorName liked your post',
-      };
+    ActivityKind.post => '$actorName shared a new post',
+    ActivityKind.reply => '$actorName replied',
+    ActivityKind.answer => '$actorName replied to you',
+    ActivityKind.like => '$actorName liked your post',
+    ActivityKind.replyLike => '$actorName liked your reply',
+  };
 
-  String get body => preview.isNotEmpty ? preview : (kind == ActivityKind.post ? 'Photos' : 'Your post');
+  String get body => preview.isNotEmpty
+      ? preview
+      : switch (kind) {
+          ActivityKind.post => 'Photos',
+          ActivityKind.reply || ActivityKind.answer || ActivityKind.replyLike => 'Photo',
+          ActivityKind.like => 'Your post',
+        };
 }
 
 /// Phone notifications for what the other person does.

@@ -37,6 +37,12 @@ abstract interface class NotesRepository {
   /// Likes or unlikes the entry as the signed-in person. Safe to repeat.
   Future<void> setLiked(String noteId, {required bool liked});
 
+  /// Records that you've read the other person's shared entry (once).
+  Future<void> markSeen(String noteId);
+
+  /// Pins or unpins an entry on your own profile.
+  Future<void> setPinned(String noteId, {required bool pinned});
+
   /// Deletes your own entry (with its replies, likes and photo rows).
   /// Throws [NoteNotFound] if it's already gone or isn't yours.
   Future<void> deleteNote(String id);
@@ -77,13 +83,7 @@ class SupabaseNotesRepository implements NotesRepository {
     try {
       final row = await _client
           .from('notes')
-          .insert({
-            'id': id,
-            'title': title,
-            'body': body,
-            'status': status.name,
-            'entry_date': Dates.iso(entryDate),
-          })
+          .insert({'id': id, 'title': title, 'body': body, 'status': status.name, 'entry_date': Dates.iso(entryDate)})
           .select(Note.columns)
           .single()
           .timeout(timeout);
@@ -136,6 +136,29 @@ class SupabaseNotesRepository implements NotesRepository {
     } else {
       // RLS limits this to your own like.
       await _client.from('note_likes').delete().eq('note_id', noteId).timeout(timeout);
+    }
+  });
+
+  @override
+  Future<void> markSeen(String noteId) => _guard(() async {
+    try {
+      await _client.from('note_views').insert({'note_id': noteId}).timeout(timeout);
+    } on PostgrestException catch (e) {
+      if (e.code != '23505') rethrow; // already seen
+    }
+  });
+
+  @override
+  Future<void> setPinned(String noteId, {required bool pinned}) => _guard(() async {
+    if (pinned) {
+      try {
+        await _client.from('note_pins').insert({'note_id': noteId}).timeout(timeout);
+      } on PostgrestException catch (e) {
+        if (e.code != '23505') rethrow; // already pinned
+      }
+    } else {
+      // RLS limits this to your own pin.
+      await _client.from('note_pins').delete().eq('note_id', noteId).timeout(timeout);
     }
   });
 

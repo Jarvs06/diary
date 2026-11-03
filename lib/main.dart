@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/app_dependencies.dart';
+import 'core/storage/photo_cache.dart';
 import 'core/auth/auth_session.dart';
 import 'core/config/app_config.dart';
 import 'core/device/device_services.dart';
@@ -54,6 +55,7 @@ Future<void> main() async {
   );
 
   final client = Supabase.instance.client;
+  final photoCache = createPhotoCache();
   final auth = SupabaseAuthSession(client.auth);
   // The web version (GitHub Pages, e.g. on an iPhone) has no phone
   // notifications, background checks or fingerprint lock.
@@ -76,8 +78,8 @@ Future<void> main() async {
         authSession: auth,
         participantsRepository: SupabaseParticipantsRepository(client),
         notesRepository: SupabaseNotesRepository(client),
-        repliesRepository: SupabaseRepliesRepository(client),
-        photosRepository: SupabasePhotosRepository(client),
+        repliesRepository: SupabaseRepliesRepository(client, diskCache: photoCache),
+        photosRepository: SupabasePhotosRepository(client, diskCache: photoCache),
         photoPicker: DevicePhotoPicker(),
         syncService: SupabaseSyncService(client),
         notifications: notifications,
