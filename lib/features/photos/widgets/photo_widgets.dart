@@ -147,7 +147,12 @@ class PhotoCarousel extends StatelessWidget {
         label: 'Photo ${i + 1} of ${photos.length}',
         child: GestureDetector(
           key: ValueKey('photo-${photos[i].id}'),
-          onTap: () => PhotoViewerScreen.open(context, photos: photos, load: loadFull ?? load, initial: i),
+          onTap: () => PhotoViewerScreen.open(
+            context,
+            paths: [for (final p in photos) p.storagePath],
+            load: loadFull ?? load,
+            initial: i,
+          ),
           child: DecoratedBox(
             position: DecorationPosition.foreground,
             decoration: BoxDecoration(
@@ -181,21 +186,22 @@ class PhotoCarousel extends StatelessWidget {
 
 /// Full-screen photos: swipe between them, pinch to zoom.
 class PhotoViewerScreen extends StatefulWidget {
-  const PhotoViewerScreen({super.key, required this.photos, required this.load, this.initial = 0});
+  const PhotoViewerScreen({super.key, required this.paths, required this.load, this.initial = 0});
 
-  final List<NotePhoto> photos;
+  /// The files to show, in order.
+  final List<String> paths;
   final PhotoLoader load;
   final int initial;
 
   static Future<void> open(
     BuildContext context, {
-    required List<NotePhoto> photos,
+    required List<String> paths,
     required PhotoLoader load,
     int initial = 0,
   }) => Navigator.of(context).push(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => PhotoViewerScreen(photos: photos, load: load, initial: initial),
+      builder: (_) => PhotoViewerScreen(paths: paths, load: load, initial: initial),
     ),
   );
 
@@ -215,7 +221,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final count = widget.photos.length;
+    final count = widget.paths.length;
     return Scaffold(
       key: const Key('photo-viewer'),
       backgroundColor: Colors.black,
@@ -234,11 +240,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         itemBuilder: (context, i) => InteractiveViewer(
           maxScale: 4,
           child: Center(
-            child: RemotePhoto(
-              storagePath: widget.photos[i].storagePath,
-              load: widget.load,
-              fit: BoxFit.contain,
-            ),
+            child: RemotePhoto(storagePath: widget.paths[i], load: widget.load, fit: BoxFit.contain),
           ),
         ),
       ),

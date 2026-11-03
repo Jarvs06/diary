@@ -374,6 +374,61 @@ r = await as("authenticated", JANINA,
   "delete from public.replies where id = '10000000-0000-4000-8000-000000000001' returning id");
 check("Janina deletes her own reply", r.rows?.length === 1, r);
 
+// ---------------------------------------------------------------- answers and reply photos
+const R = (n: number) => `30000000-0000-4000-8000-00000000000${n}`;
+r = await as("authenticated", JANINA, "insert into public.replies (id, note_id, body) values ($1, $2, 'top') returning id", [R(1), letterId]);
+check("a top-level reply", r.rows?.length === 1, r);
+r = await as("authenticated", ME,
+  "insert into public.replies (id, note_id, body, parent_id) values ($1, $2, 'answer', $3) returning parent_id", [R(2), letterId, R(1)]);
+check("you can answer a reply", r.rows?.[0]?.parent_id === R(1), r);
+r = await as("authenticated", JANINA,
+  "insert into public.replies (id, note_id, body, parent_id) values ($1, $2, 'deeper', $3)", [R(3), letterId, R(2)]);
+check("an answer cannot be answered (one level)", r.error !== null, r);
+r = await as("authenticated", JANINA,
+  "insert into public.replies (id, note_id, body, parent_id) values ($1, $2, 'elsewhere', $3)", [R(3), janinaEntry, R(1)]);
+check("an answer must be on the same post", r.error !== null, r);
+r = await as("authenticated", ME, "update public.replies set parent_id = null where id = $1", [R(2)]);
+check("what a reply answers can't be changed", r.error !== null, r);
+r = await as("authenticated", JANINA, "insert into public.replies (id, note_id, body) values ($1, $2, '  ')", [R(4), letterId]);
+check("a reply without a photo still needs text", r.error !== null, r);
+r = await as("authenticated", JANINA,
+  "insert into public.replies (id, note_id, body, image_path) values ($1, $2, '', $3) returning image_path", [R(4), letterId, `${R(4)}.jpg`]);
+check("a photo-only reply", r.rows?.[0]?.image_path === `${R(4)}.jpg`, r);
+r = await as("authenticated", JANINA,
+  "insert into public.replies (id, note_id, body, image_path) values ($1, $2, 'x', $3)", [R(5), letterId, `${R(4)}.jpg`]);
+check("a reply's photo must be named after the reply", r.error !== null, r);
+r = await as("authenticated", JANINA, "update public.replies set image_path = null where id = $1", [R(4)]);
+check("a reply's photo can't be swapped by an update", r.error !== null, r);
+
+row = await one("select public, file_size_limit, allowed_mime_types from storage.buckets where id = 'reply-images'");
+check("reply photos bucket is private, JPEG only", row.public === false && row.allowed_mime_types.join() === "image/jpeg", row);
+const replyUpload = (user: string, name: string) =>
+  as("authenticated", user, "insert into storage.objects (bucket_id, name) values ('reply-images', $1) returning name", [name]);
+r = await replyUpload(ME, `${R(4)}.jpg`);
+check("you cannot upload the photo of someone else's reply", r.error !== null, r);
+r = await replyUpload(JANINA, `${R(9)}.jpg`);
+check("no upload without a matching reply", r.error !== null, r);
+r = await replyUpload(JANINA, `${R(4)}.jpg`);
+check("Janina uploads her reply's photo", r.rows?.length === 1, r);
+r = await as("authenticated", ME, "select name from storage.objects where bucket_id = 'reply-images'");
+check("the other person can see it", r.rows?.length === 1, r);
+r = await as("authenticated", STRANGER, "select name from storage.objects where bucket_id = 'reply-images'");
+check("an outsider cannot see reply photos", r.error === null && r.rows!.length === 0, r);
+r = await as("anon", null, "select name from storage.objects where bucket_id = 'reply-images'");
+check("anon cannot see reply photos", r.error !== null || r.rows!.length === 0, r);
+await as("authenticated", ME, "update public.notes set status = 'draft' where id = $1", [letterId]);
+r = await as("authenticated", JANINA, "select name from storage.objects where bucket_id = 'reply-images'");
+check("the uploader still sees her own photo while the post is a draft", r.rows?.length === 1, r);
+await as("authenticated", ME, "update public.notes set status = 'published' where id = $1", [letterId]);
+r = await as("authenticated", ME, "delete from storage.objects where bucket_id = 'reply-images' returning id");
+check("you cannot remove someone else's reply photo", r.rows?.length === 0, r);
+r = await as("authenticated", JANINA, "delete from public.replies where id = $1 returning id", [R(4)]);
+r = await as("authenticated", JANINA, "delete from storage.objects where bucket_id = 'reply-images' returning id");
+check("after deleting the reply, its author removes the photo", r.rows?.length === 1, r);
+r = await as("authenticated", JANINA, "delete from public.replies where id = $1 returning id", [R(1)]);
+row = await one("select count(*)::int as c from public.replies where id = $1", [R(2)]);
+check("deleting a reply deletes its answers", r.rows?.length === 1 && row.c === 0, { r, row });
+
 // ---------------------------------------------------------------- app releases
 await one("insert into public.app_releases (version_code, version_name, apk_url) values (2, '1.0.1', 'https://example.com/a.apk')");
 r = await as("authenticated", JANINA, "select version_code, apk_url from public.app_releases");

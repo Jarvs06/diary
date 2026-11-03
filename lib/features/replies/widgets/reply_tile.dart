@@ -3,15 +3,20 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/dates.dart';
 import '../../../core/widgets/ornaments.dart';
+import '../../photos/widgets/photo_widgets.dart';
 import '../models/reply.dart';
 
-/// One reply under an entry, laid out like a Threads reply.
+/// One reply under an entry, laid out like a Threads reply. An answer to
+/// another reply ([isAnswer]) is indented under it with a smaller picture.
 class ReplyTile extends StatelessWidget {
   const ReplyTile({
     super.key,
     required this.reply,
     required this.authorName,
     required this.isMine,
+    required this.loadPhoto,
+    this.isAnswer = false,
+    this.onReply,
     this.onEdit,
     this.onDelete,
   });
@@ -19,6 +24,11 @@ class ReplyTile extends StatelessWidget {
   final Reply reply;
   final String authorName;
   final bool isMine;
+  final PhotoLoader loadPhoto;
+  final bool isAnswer;
+
+  /// The "Reply" button under the text.
+  final VoidCallback? onReply;
 
   /// Shown in the ··· menu on your own replies.
   final VoidCallback? onEdit;
@@ -30,11 +40,11 @@ class ReplyTile extends StatelessWidget {
       label: '${isMine ? 'You' : authorName}, ${Dates.stamp(reply.createdAt)}',
       child: Padding(
         key: ValueKey('reply-${reply.id}'),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: EdgeInsets.fromLTRB(isAnswer ? 60 : 16, isAnswer ? 8 : 12, 16, isAnswer ? 4 : 6),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Avatar(name: authorName, size: 32),
+            Avatar(name: authorName, size: isAnswer ? 24 : 32),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -61,8 +71,29 @@ class ReplyTile extends StatelessWidget {
                       if (onEdit != null || onDelete != null) _menu(context),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  SelectableText(reply.body, style: context.text.bodyLarge),
+                  if (reply.body.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    SelectableText(reply.body, style: context.text.bodyLarge),
+                  ],
+                  if (reply.imagePath case final path?) ...[
+                    const SizedBox(height: 8),
+                    _ReplyPhoto(path: path, load: loadPhoto),
+                  ],
+                  if (onReply != null)
+                    TextButton(
+                      key: ValueKey('reply-to-${reply.id}'),
+                      onPressed: onReply,
+                      style: TextButton.styleFrom(
+                        foregroundColor: context.muted,
+                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        textStyle: context.text.labelLarge,
+                      ),
+                      child: const Text('Reply'),
+                    )
+                  else
+                    const SizedBox(height: 6),
                 ],
               ),
             ),
@@ -104,9 +135,44 @@ class ReplyTile extends StatelessWidget {
   );
 }
 
+/// A reply's photo: a rounded preview that opens full screen.
+class _ReplyPhoto extends StatelessWidget {
+  const _ReplyPhoto({required this.path, required this.load});
+
+  final String path;
+  final PhotoLoader load;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Photo',
+      child: GestureDetector(
+        key: ValueKey('reply-photo-$path'),
+        onTap: () => PhotoViewerScreen.open(context, paths: [path], load: load),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 260, maxWidth: 240),
+            child: AspectRatio(
+              aspectRatio: 4 / 5,
+              child: ColoredBox(
+                color: context.colors.surfaceContainerHighest,
+                child: RemotePhoto(storagePath: path, load: load, cacheWidth: 600),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Edits a reply's text in a dialog. Returns the new text, or null if cancelled.
-Future<String?> editReplyText(BuildContext context, String current) =>
-    showDialog<String>(context: context, builder: (_) => _EditReplyDialog(initial: current));
+Future<String?> editReplyText(BuildContext context, String current) => showDialog<String>(
+  context: context,
+  builder: (_) => _EditReplyDialog(initial: current),
+);
 
 class _EditReplyDialog extends StatefulWidget {
   const _EditReplyDialog({required this.initial});

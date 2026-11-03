@@ -6,6 +6,8 @@ import '../../../core/app_dependencies.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/ornaments.dart';
+import '../../photos/models/photo.dart';
+import '../../photos/services/photo_picker.dart';
 import '../../replies/models/reply.dart';
 import '../../replies/services/thread_controller.dart';
 import '../../replies/widgets/reply_composer.dart';
@@ -62,6 +64,13 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
   final _scroll = ScrollController();
   final _replyFocus = FocusNode();
   late bool _focusReplyOnLoad = widget.startReplying;
+
+  /// The top-level reply being answered, if any.
+  Reply? _answering;
+  PickedPhoto? _photo;
+
+  /// Top-level replies whose answers are shown.
+  final _expanded = <String>{};
   StreamSubscription<void>? _syncSub;
   Timer? _debounce;
   int _seenReplies = 0;
@@ -117,7 +126,15 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
         if (mounted) _replyFocus.requestFocus();
       });
     }
-    final count = _thread.replies.length;
+    final all = _thread.replies;
+    // Opening a post whose newest reply is an answer shows that thread.
+    if (_seenReplies == 0 && all.isNotEmpty && all.last.parentId != null) _expanded.add(all.last.parentId!);
+    if (_answering != null && !all.any((r) => r.id == _answering!.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _answering = null);
+      });
+    }
+    final count = all.length;
     if (count > _seenReplies && _seenReplies > 0 && _nearBottom) _scrollToEnd();
     _seenReplies = count;
   }
@@ -136,11 +153,47 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _send() async {
-    final reply = await _thread.send(_composer.text);
+    final answering = _answering;
+    final reply = await _thread.send(_composer.text, parentId: answering?.id, photo: _photo);
     if (reply == null || !mounted) return;
     _composer.clear();
+    setState(() {
+      _photo = null;
+      _answering = null;
+    });
     _seenReplies = _thread.replies.length;
-    _scrollToEnd();
+    if (answering == null) _scrollToEnd();
+  }
+
+  /// Answers [reply]. An answer to an answer goes under the same top-level
+  /// reply and starts with "@name".
+  void _answer(Reply reply) {
+    final top = reply.parentId == null
+        ? reply
+        : _thread.replies.firstWhere((r) => r.id == reply.parentId, orElse: () => reply);
+    setState(() {
+      _answering = top;
+      _expanded.add(top.id);
+    });
+    if (reply.parentId != null && !_people.isMine(reply.authorId)) {
+      final mention = '@${_people.nameOf(reply.authorId)} ';
+      if (!_composer.text.startsWith(mention)) {
+        _composer.value = TextEditingValue(
+          text: '$mention${_composer.text}',
+          selection: TextSelection.collapsed(offset: mention.length + _composer.text.length),
+        );
+      }
+    }
+    _replyFocus.requestFocus();
+  }
+
+  Future<void> _pickPhoto() async {
+    try {
+      final picked = await _deps.photoPicker.pick(PhotoSource.gallery, limit: 1);
+      if (picked.isNotEmpty && mounted) setState(() => _photo = picked.first);
+    } on AppFailure catch (f) {
+      _notice(f);
+    }
   }
 
   Future<void> _edit(Note note) async {
@@ -193,11 +246,7 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
           final failure = _thread.failure;
           if (note == null) {
             if (failure != null && !_thread.isLoading) {
-              return CenteredMessage(
-                message: failure.message,
-                actionLabel: 'Try again',
-                onAction: _thread.load,
-              );
+              return CenteredMessage(message: failure.message, actionLabel: 'Try again', onAction: _thread.load);
             }
             return const Center(child: CircularProgressIndicator(strokeWidth: 2));
           }
@@ -229,16 +278,10 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       ReadableWidth(child: _repliesHeader()),
-                      for (final reply in _thread.replies)
-                        ReadableWidth(
-                          child: ReplyTile(
-                            reply: reply,
-                            authorName: _people.nameOf(reply.authorId),
-                            isMine: _people.isMine(reply.authorId),
-                            onEdit: _people.isMine(reply.authorId) ? () => _editReply(reply) : null,
-                            onDelete: _people.isMine(reply.authorId) ? () => _deleteReply(reply) : null,
-                          ),
-                        ),
+                      for (final reply in _thread.topLevel) ...[
+                        ReadableWidth(child: _replyTile(reply)),
+                        ..._answers(reply),
+                      ],
                     ],
                   ),
                 ),
@@ -254,12 +297,50 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
                   myName: _people.me?.displayName ?? '',
                   recipientName: mine ? (_people.other?.displayName ?? '') : _people.nameOf(note.authorId),
                   onSend: _send,
+                  photo: _photo,
+                  onPickPhoto: _pickPhoto,
+                  onRemovePhoto: () => setState(() => _photo = null),
+                  answeringName: _answering == null ? null : _people.nameOf(_answering!.authorId),
+                  onStopAnswering: () => setState(() => _answering = null),
                 ),
             ],
           );
         },
       ),
     );
+  }
+
+  Widget _replyTile(Reply reply) {
+    final mine = _people.isMine(reply.authorId);
+    return ReplyTile(
+      reply: reply,
+      authorName: _people.nameOf(reply.authorId),
+      isMine: mine,
+      isAnswer: reply.parentId != null,
+      loadPhoto: _deps.repliesRepository.loadPhoto,
+      onReply: () => _answer(reply),
+      onEdit: mine ? () => _editReply(reply) : null,
+      onDelete: mine ? () => _deleteReply(reply) : null,
+    );
+  }
+
+  /// The answers under [top]: hidden behind "View n replies" until opened.
+  List<Widget> _answers(Reply top) {
+    final answers = _thread.answersTo(top.id);
+    if (answers.isEmpty) return const [];
+    final open = _expanded.contains(top.id);
+    return [
+      if (open)
+        for (final answer in answers) ReadableWidth(child: _replyTile(answer)),
+      ReadableWidth(
+        child: _AnswersToggle(
+          key: ValueKey('view-answers-${top.id}'),
+          count: answers.length,
+          open: open,
+          onTap: () => setState(() => open ? _expanded.remove(top.id) : _expanded.add(top.id)),
+        ),
+      ),
+    ];
   }
 
   Widget _repliesHeader() {
@@ -280,6 +361,42 @@ class _PostScreenState extends State<PostScreen> with WidgetsBindingObserver {
             : '$count replies',
         key: const Key('replies-header'),
         style: context.text.titleSmall,
+      ),
+    );
+  }
+}
+
+/// "View 3 replies" / "Hide replies" under a reply with answers.
+class _AnswersToggle extends StatelessWidget {
+  const _AnswersToggle({super.key, required this.count, required this.open, required this.onTap});
+
+  final int count;
+  final bool open;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(52, 0, 16, 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: onTap,
+          style: TextButton.styleFrom(
+            foregroundColor: context.colors.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: const Size(0, 36),
+            textStyle: context.text.labelLarge,
+          ),
+          icon: Icon(open ? Icons.expand_less : Icons.expand_more, size: 20),
+          label: Text(
+            open
+                ? 'Hide replies'
+                : count == 1
+                ? 'View 1 reply'
+                : 'View $count replies',
+          ),
+        ),
       ),
     );
   }

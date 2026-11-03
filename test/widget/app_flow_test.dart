@@ -98,10 +98,13 @@ void main() {
 
   group('feed', () {
     testWidgets("shows both people's shared entries, newest post first", (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [
-        note(id: 'a', title: 'Older', body: 'Older body', at: t0),
-        note(id: 'b', authorId: janinaId, title: 'Newer', body: 'Newer body', at: t0.add(const Duration(hours: 1))),
-      ]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [
+          note(id: 'a', title: 'Older', body: 'Older body', at: t0),
+          note(id: 'b', authorId: janinaId, title: 'Newer', body: 'Newer body', at: t0.add(const Duration(hours: 1))),
+        ],
+      );
       await start(tester);
 
       final older = tester.getTopLeft(find.byKey(const ValueKey('post-a')));
@@ -111,7 +114,10 @@ void main() {
 
     testWidgets('text-only entries show 6 lines in the feed, then See more', (tester) async {
       final long = List.generate(30, (i) => 'Line $i').join('\n');
-      world = FakeWorld(signedInAs: janinaId, notes: [note(body: long)]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [note(body: long)],
+      );
       await start(tester);
       expect(tester.widget<Text>(find.byKey(const Key('note-body'))).maxLines, 6);
       expect(find.byKey(const Key('see-more')), findsOneWidget);
@@ -123,7 +129,10 @@ void main() {
     });
 
     testWidgets('entries with photos show 2 lines, then See more', (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [note(body: 'One\nTwo\nThree')]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [note(body: 'One\nTwo\nThree')],
+      );
       world.photos.seed('p1', 'n1');
       await start(tester);
       expect(tester.widget<Text>(find.byKey(const Key('note-body'))).maxLines, 2);
@@ -131,10 +140,18 @@ void main() {
     });
 
     testWidgets('on the profile the header scrolls away and the tabs stay on top', (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [
-        for (var i = 0; i < 12; i++)
-          note(id: 'n$i', authorId: janinaId, body: 'Entry $i', at: t0.add(Duration(hours: i))),
-      ]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [
+          for (var i = 0; i < 12; i++)
+            note(
+              id: 'n$i',
+              authorId: janinaId,
+              body: 'Entry $i',
+              at: t0.add(Duration(hours: i)),
+            ),
+        ],
+      );
       await start(tester);
       await tapKey(tester, const Key('nav-profile'));
       expect(tester.getTopLeft(find.byKey(const Key('profile-name'))).dy, greaterThan(0));
@@ -157,14 +174,12 @@ void main() {
     testWidgets('light mode is cream; dark mode is black', (tester) async {
       world.auth.userId = janinaId;
       await start(tester);
-      expect(Theme.of(tester.element(find.byKey(const Key('feed')))).scaffoldBackgroundColor,
-          const Color(0xFFFEFAF3));
+      expect(Theme.of(tester.element(find.byKey(const Key('feed')))).scaffoldBackgroundColor, const Color(0xFFFEFAF3));
 
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       await tester.pumpAndSettle();
-      expect(Theme.of(tester.element(find.byKey(const Key('feed')))).scaffoldBackgroundColor,
-          const Color(0xFF000000));
+      expect(Theme.of(tester.element(find.byKey(const Key('feed')))).scaffoldBackgroundColor, const Color(0xFF000000));
     });
 
     test('people who share an initial still get different avatar colours', () {
@@ -173,9 +188,17 @@ void main() {
     });
 
     testWidgets('the nav bar shrinks while scrolling down and returns on the way up', (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [
-        for (var i = 0; i < 12; i++) note(id: 'n$i', body: 'Entry $i', at: t0.add(Duration(hours: i))),
-      ]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [
+          for (var i = 0; i < 12; i++)
+            note(
+              id: 'n$i',
+              body: 'Entry $i',
+              at: t0.add(Duration(hours: i)),
+            ),
+        ],
+      );
       await start(tester);
       double scale() => tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale;
       expect(scale(), 1);
@@ -196,7 +219,10 @@ void main() {
     });
 
     testWidgets('short entries have no See more', (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [note(body: 'Just one line.')]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [note(body: 'Just one line.')],
+      );
       world.photos.seed('p1', 'n1');
       await start(tester);
       expect(find.byKey(const Key('see-more')), findsNothing);
@@ -295,14 +321,8 @@ void main() {
     });
 
     testWidgets('notification text for each kind of activity', (tester) async {
-      NewActivity of(ActivityKind kind, String text) => NewActivity(
-        kind: kind,
-        key: 'k',
-        noteId: 'n1',
-        actorName: 'Janina',
-        text: text,
-        at: t0,
-      );
+      NewActivity of(ActivityKind kind, String text) =>
+          NewActivity(kind: kind, key: 'k', noteId: 'n1', actorName: 'Janina', text: text, at: t0);
       expect(of(ActivityKind.post, 'Hello\nmore').title, 'Janina shared a new post');
       expect(of(ActivityKind.post, 'Hello\nmore').body, 'Hello');
       expect(of(ActivityKind.post, '').body, 'Photos');
@@ -397,8 +417,12 @@ void main() {
     testWidgets('replies are listed under the entry, oldest first', (tester) async {
       world.auth.userId = janinaId;
       world.replies.store['r1'] = reply(id: 'r1', authorId: meId, body: 'From Jarvey');
-      world.replies.store['r2'] =
-          reply(id: 'r2', authorId: janinaId, body: 'From Janina', at: t0.add(const Duration(hours: 2)));
+      world.replies.store['r2'] = reply(
+        id: 'r2',
+        authorId: janinaId,
+        body: 'From Janina',
+        at: t0.add(const Duration(hours: 2)),
+      );
       await start(tester);
       await openPost(tester, 'n1');
 
@@ -524,10 +548,13 @@ void main() {
     });
 
     testWidgets('tapping a draft reopens it in the composer and Post shares it', (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [
-        note(),
-        note(id: 'd', authorId: janinaId, status: NoteStatus.draft, body: 'Almost'),
-      ]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [
+          note(),
+          note(id: 'd', authorId: janinaId, status: NoteStatus.draft, body: 'Almost'),
+        ],
+      );
       await start(tester);
       await tapKey(tester, const Key('nav-profile'));
       await tapKey(tester, const Key('tab-drafts'));
@@ -589,16 +616,22 @@ void main() {
     });
 
     testWidgets('an entry without a title shows just the text', (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [note(title: '')]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [note(title: '')],
+      );
       await start(tester);
       expect(find.byKey(const Key('note-title')), findsNothing);
     });
 
     testWidgets('a backdated entry shows its own date and sits with that day in the feed', (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [
-        note(id: 'aug', body: 'In August', entryDate: DateTime(2026, 8, 13), at: DateTime.utc(2026, 10, 31, 12)),
-        note(id: 'oct', body: 'In October', entryDate: DateTime(2026, 10, 30), at: DateTime.utc(2026, 10, 30, 12)),
-      ]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [
+          note(id: 'aug', body: 'In August', entryDate: DateTime(2026, 8, 13), at: DateTime.utc(2026, 10, 31, 12)),
+          note(id: 'oct', body: 'In October', entryDate: DateTime(2026, 10, 30), at: DateTime.utc(2026, 10, 30, 12)),
+        ],
+      );
       await start(tester);
       expect(find.text('Aug 13'), findsOneWidget);
       expect(find.text('Oct 30'), findsOneWidget);
@@ -620,7 +653,8 @@ void main() {
       expect(world.picker.requests.single.limit, 3);
       expect(find.text('3/3'), findsOneWidget);
       final gallery = tester.widget<IconButton>(
-          find.descendant(of: find.byKey(const Key('add-photo-button')), matching: find.byType(IconButton)));
+        find.descendant(of: find.byKey(const Key('add-photo-button')), matching: find.byType(IconButton)),
+      );
       expect(gallery.onPressed, isNull);
 
       await tester.enterText(find.byKey(const Key('note-body-field')), 'A good day.');
@@ -649,8 +683,13 @@ void main() {
       await tapKey(tester, const Key('add-photo-button'));
       expect(find.text('2/3'), findsOneWidget);
 
-      await tester.tap(find.byWidgetPredicate(
-          (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('remove-photo-')).first);
+      await tester.tap(
+        find
+            .byWidgetPredicate(
+              (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('remove-photo-'),
+            )
+            .first,
+      );
       await tester.pumpAndSettle();
       expect(find.text('1/3'), findsOneWidget);
     });
@@ -680,10 +719,13 @@ void main() {
     });
 
     testWidgets("photos of the other person's draft are never shown", (tester) async {
-      world = FakeWorld(signedInAs: janinaId, notes: [
-        note(),
-        note(id: 'd', status: NoteStatus.draft, at: t0.add(const Duration(hours: 1))),
-      ]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [
+          note(),
+          note(id: 'd', status: NoteStatus.draft, at: t0.add(const Duration(hours: 1))),
+        ],
+      );
       world.photos.seed('secret', 'd');
       await start(tester);
       expect(find.byKey(const ValueKey('photo-secret')), findsNothing);
@@ -765,6 +807,113 @@ void main() {
     });
   });
 
+  group('replies: answers and photos', () {
+    testWidgets('you can answer a reply; it shows indented under it', (tester) async {
+      world.auth.userId = meId;
+      world.replies.store['r1'] = reply(); // from Janina
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, const ValueKey('reply-to-r1'));
+      expect(find.text('Replying to Janina'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('reply-field')), 'Always.');
+      await tester.pump();
+      await tapKey(tester, const Key('reply-send-button'));
+
+      final answer = world.replies.store.values.singleWhere((r) => r.body == 'Always.');
+      expect(answer.parentId, 'r1');
+      expect(find.byKey(ValueKey('reply-${answer.id}')), findsOneWidget);
+      expect(find.byKey(const Key('answering-label')), findsNothing);
+      expect(find.text('Hide replies'), findsOneWidget);
+    });
+
+    testWidgets('answers are hidden behind "View n replies" until opened', (tester) async {
+      world.auth.userId = meId;
+      world.replies.store['r1'] = reply();
+      world.replies.addFrom(meId, 'n1', 'One', parentId: 'r1');
+      world.replies.addFrom(janinaId, 'n1', 'Top two');
+      await start(tester);
+      await openPost(tester, 'n1');
+
+      expect(find.text('One'), findsNothing);
+      expect(find.text('View 1 reply'), findsOneWidget);
+      await tapKey(tester, const ValueKey('view-answers-r1'));
+      expect(find.text('One'), findsOneWidget);
+      await tapKey(tester, const ValueKey('view-answers-r1'));
+      expect(find.text('One'), findsNothing);
+    });
+
+    testWidgets('answering an answer files it under the same reply, with @name', (tester) async {
+      world.auth.userId = meId;
+      world.replies.store['r1'] = reply();
+      final answer = world.replies.addFrom(janinaId, 'n1', 'Me too', parentId: 'r1');
+      await start(tester);
+      await openPost(tester, 'n1');
+      // The newest reply is an answer, so its thread starts open.
+      await tapKey(tester, ValueKey('reply-to-${answer.id}'));
+      final field = tester.widget<TextField>(find.byKey(const Key('reply-field')));
+      expect(field.controller!.text, '@Janina ');
+      await tester.enterText(find.byKey(const Key('reply-field')), '@Janina see you soon');
+      await tester.pump();
+      await tapKey(tester, const Key('reply-send-button'));
+
+      final sent = world.replies.store.values.singleWhere((r) => r.body == '@Janina see you soon');
+      expect(sent.parentId, 'r1');
+    });
+
+    testWidgets('a reply can carry a photo, even without text', (tester) async {
+      world.auth.userId = janinaId;
+      world.picker.next = [picked()];
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, const Key('reply-photo-button'));
+      expect(find.byKey(const Key('reply-photo-preview')), findsOneWidget);
+      await tapKey(tester, const Key('reply-send-button'));
+
+      final sent = world.replies.store.values.single;
+      expect(sent.body, isEmpty);
+      expect(sent.imagePath, '${sent.id}.jpg');
+      expect(world.replies.photoFiles[sent.imagePath], isNotNull);
+      expect(find.byKey(const Key('reply-photo-preview')), findsNothing);
+      expect(find.byKey(ValueKey('reply-photo-${sent.imagePath}')), findsOneWidget);
+    });
+
+    testWidgets('a picked photo can be removed before sending', (tester) async {
+      world.auth.userId = janinaId;
+      world.picker.next = [picked()];
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, const Key('reply-photo-button'));
+      await tapKey(tester, const Key('remove-reply-photo-button'));
+      expect(find.byKey(const Key('reply-photo-preview')), findsNothing);
+      final send = tester.widget<IconButton>(find.byKey(const Key('reply-send-button')));
+      expect(send.onPressed, isNull);
+    });
+
+    testWidgets("the other person's reply photo opens full screen", (tester) async {
+      world.auth.userId = meId;
+      final r = world.replies.addFrom(janinaId, 'n1', 'Look', withPhoto: true);
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, ValueKey('reply-photo-${r.imagePath}'));
+      expect(find.byKey(const Key('photo-viewer')), findsOneWidget);
+    });
+
+    testWidgets('deleting a reply removes its answers too', (tester) async {
+      world.auth.userId = janinaId;
+      world.replies.store['r1'] = reply();
+      world.replies.addFrom(meId, 'n1', 'Answer', parentId: 'r1');
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, const ValueKey('reply-menu-r1'));
+      await tapKey(tester, const Key('delete-reply-button'));
+      await tapKey(tester, const Key('confirm-delete-reply-button'));
+
+      expect(world.replies.store, isEmpty);
+      expect(find.text('Answer'), findsNothing);
+      expect(find.text('No replies yet'), findsOneWidget);
+    });
+  });
+
   group('composer keeps unsaved text', () {
     testWidgets('text typed in a new entry comes back after closing the app', (tester) async {
       world.auth.userId = janinaId;
@@ -805,14 +954,22 @@ void main() {
 
     testWidgets('a newer release is offered at the top of the feed', (tester) async {
       world.auth.userId = janinaId;
-      world.releases.release = const AppRelease(versionCode: 2, versionName: '1.0.1', apkUrl: 'https://example.com/a.apk');
+      world.releases.release = const AppRelease(
+        versionCode: 2,
+        versionName: '1.0.1',
+        apkUrl: 'https://example.com/a.apk',
+      );
       await start(tester);
       expect(find.text('Version 1.0.1 is available'), findsOneWidget);
     });
 
     testWidgets('the same or an older release is not offered', (tester) async {
       world.auth.userId = janinaId;
-      world.releases.release = const AppRelease(versionCode: 1, versionName: '1.0.0', apkUrl: 'https://example.com/a.apk');
+      world.releases.release = const AppRelease(
+        versionCode: 1,
+        versionName: '1.0.0',
+        apkUrl: 'https://example.com/a.apk',
+      );
       await start(tester);
       expect(find.byKey(const Key('update-banner')), findsNothing);
     });
@@ -836,7 +993,8 @@ void main() {
       // n1 is dated Oct 28, 2026.
       while (!find.text('October 2026').evaluate().isNotEmpty) {
         final month = tester.widget<Text>(find.byKey(const Key('calendar-month'))).data!;
-        final forward = int.parse(month.split(' ').last) < 2026 ||
+        final forward =
+            int.parse(month.split(' ').last) < 2026 ||
             (month.startsWith('Jan') || month.startsWith('Feb')) && month.endsWith('2026');
         await tapKey(tester, Key(forward ? 'next-month' : 'previous-month'));
       }
@@ -846,9 +1004,10 @@ void main() {
 
     testWidgets('"On this day" shows entries from this day in earlier years', (tester) async {
       final now = DateTime.now();
-      world = FakeWorld(signedInAs: janinaId, notes: [
-        note(id: 'old', body: 'A year ago today', entryDate: DateTime(now.year - 1, now.month, now.day)),
-      ]);
+      world = FakeWorld(
+        signedInAs: janinaId,
+        notes: [note(id: 'old', body: 'A year ago today', entryDate: DateTime(now.year - 1, now.month, now.day))],
+      );
       await start(tester);
       expect(find.byKey(const Key('on-this-day')), findsOneWidget);
       expect(find.textContaining('1 year ago'), findsOneWidget);
@@ -896,6 +1055,7 @@ void main() {
     testWidgets('Jarvey exports a zip with the posts, replies and photos', (tester) async {
       world.auth.userId = meId;
       world.replies.store['r1'] = reply();
+      final answer = world.replies.addFrom(meId, 'n1', 'Look', parentId: 'r1', withPhoto: true);
       world.photos.seed('p1', 'n1');
       await start(tester);
       await tapKey(tester, const Key('nav-profile'));
@@ -907,11 +1067,15 @@ void main() {
       final zip = ZipDecoder().decodeBytes(world.exportSaver.bytes!);
       final names = zip.files.map((f) => f.name).toList();
       expect(names, containsAll(['diary.json', 'diary.html']));
-      expect(names.where((n) => n.startsWith('photos/')), hasLength(1));
+      expect(names.where((n) => n.startsWith('photos/')), hasLength(2));
+      expect(names, contains('photos/replies/${answer.imagePath}'));
       final json = jsonDecode(utf8.decode(zip.findFile('diary.json')!.content as List<int>)) as Map<String, dynamic>;
       final post = (json['posts'] as List).single as Map<String, dynamic>;
       expect(post['author'], 'Jarvey');
-      expect((post['replies'] as List).single['body'], 'Thank you.');
+      final replies = post['replies'] as List;
+      expect(replies.first['body'], 'Thank you.');
+      expect(replies.last['reply_to'], 'r1');
+      expect(replies.last['photo'], 'photos/replies/${answer.imagePath}');
       expect(find.byKey(const Key('export-progress')), findsNothing);
     });
   });

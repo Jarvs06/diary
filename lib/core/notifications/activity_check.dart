@@ -41,7 +41,7 @@ class SupabaseActivityChecker implements ActivityChecker {
           .limit(10),
       _client
           .from('replies')
-          .select('id, note_id, author_id, body, created_at')
+          .select('id, note_id, author_id, body, created_at, image_path')
           .neq('author_id', me)
           .gt('created_at', since)
           .order('created_at')
@@ -81,7 +81,9 @@ class SupabaseActivityChecker implements ActivityChecker {
           key: 'reply-${r['id']}',
           noteId: r['note_id'] as String,
           actorName: name(r['author_id']),
-          text: r['body'] as String? ?? '',
+          text: (r['body'] as String? ?? '').trim().isEmpty && r['image_path'] != null
+              ? 'Sent a photo'
+              : r['body'] as String? ?? '',
           at: DateTime.parse(r['created_at'] as String),
         ),
       for (final r in results[2])

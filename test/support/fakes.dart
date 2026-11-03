@@ -63,13 +63,7 @@ Reply reply({
   String authorId = janinaId,
   String body = 'Thank you.',
   DateTime? at,
-}) => Reply(
-  id: id,
-  noteId: noteId,
-  authorId: authorId,
-  body: body,
-  createdAt: at ?? t0.add(const Duration(hours: 1)),
-);
+}) => Reply(id: id, noteId: noteId, authorId: authorId, body: body, createdAt: at ?? t0.add(const Duration(hours: 1)));
 
 /// Records calls and replies with a scripted response or error.
 class FakeBackendClient implements BackendClient {
@@ -196,8 +190,7 @@ class FakeNotesRepository implements NotesRepository {
   final likes = <String, Set<String>>{};
   final deleted = <String>[];
 
-  Note _withCount(Note n) =>
-      n.copyWith(replyCount: countReplies(n.id), likedBy: (likes[n.id] ?? const {}).toList());
+  Note _withCount(Note n) => n.copyWith(replyCount: countReplies(n.id), likedBy: (likes[n.id] ?? const {}).toList());
 
   @override
   Future<void> setLiked(String noteId, {required bool liked}) async {
@@ -329,25 +322,49 @@ class FakeRepliesRepository implements RepliesRepository {
   @override
   Future<List<Reply>> fetchReplies(String noteId) async {
     if (nextFailure != null) throw nextFailure!;
-    return store.values.where((r) => r.noteId == noteId).toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return store.values.where((r) => r.noteId == noteId).toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
+  /// Reply photos on the "server", by image path.
+  final photoFiles = <String, Uint8List>{};
+
   @override
-  Future<Reply> sendReply({required String id, required String noteId, required String body}) async {
+  Future<Reply> sendReply({
+    required String id,
+    required String noteId,
+    required String body,
+    String? parentId,
+    PickedPhoto? photo,
+  }) async {
     sendCalls++;
     sentIds.add(id);
     if (gate != null) await gate!.future;
     if (nextFailure != null) throw nextFailure!;
-    final parent = notes.store[noteId];
-    if (parent == null || parent.status != NoteStatus.published) throw const NotAllowed();
+    final entry = notes.store[noteId];
+    if (entry == null || entry.status != NoteStatus.published) throw const NotAllowed();
+    if (parentId != null) {
+      final parent = store[parentId];
+      // One level only, on the same entry (as the database checks).
+      if (parent == null || parent.noteId != noteId || parent.parentId != null) throw const InvalidContent();
+    }
+    if (body.trim().isEmpty && photo == null) throw const InvalidContent();
+    if (photo != null) photoFiles['$id.jpg'] = photo.bytes;
     return store[id] ??= Reply(
       id: id,
       noteId: noteId,
       authorId: auth.userId!,
       body: body,
       createdAt: notes._tick(),
+      parentId: parentId,
+      imagePath: photo == null ? null : '$id.jpg',
     );
+  }
+
+  @override
+  Future<Uint8List> loadPhoto(String imagePath) async {
+    final bytes = photoFiles[imagePath];
+    if (bytes == null) throw const NoteNotFound();
+    return bytes;
   }
 
   @override
@@ -366,21 +383,26 @@ class FakeRepliesRepository implements RepliesRepository {
   }
 
   @override
-  Future<void> deleteReply(String id) async {
+  Future<void> deleteReply(Reply reply) async {
     if (nextFailure != null) throw nextFailure!;
-    final current = store[id];
+    final current = store[reply.id];
     if (current != null && current.authorId != auth.userId) throw const NotAllowed();
-    store.remove(id);
+    store.removeWhere((id, r) => id == reply.id || r.parentId == reply.id);
+    photoFiles.remove(reply.imagePath);
   }
 
   /// Simulates the other person replying from their phone.
-  Reply addFrom(String authorId, String noteId, String body) {
+  Reply addFrom(String authorId, String noteId, String body, {String? parentId, bool withPhoto = false}) {
+    final id = 'remote-${store.length}';
+    if (withPhoto) photoFiles['$id.jpg'] = pngBytes;
     final r = Reply(
-      id: 'remote-${store.length}',
+      id: id,
       noteId: noteId,
       authorId: authorId,
       body: body,
       createdAt: notes._tick(),
+      parentId: parentId,
+      imagePath: withPhoto ? '$id.jpg' : null,
     );
     return store[r.id] = r;
   }
@@ -482,8 +504,7 @@ class FakePhotosRepository implements PhotosRepository {
   Future<List<NotePhoto>> fetchPhotos(String noteId) async {
     if (nextFailure != null) throw nextFailure!;
     await notes.fetchNote(noteId); // same visibility as the entry
-    return store.values.where((p) => p.noteId == noteId).toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return store.values.where((p) => p.noteId == noteId).toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
   @override

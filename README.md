@@ -85,6 +85,11 @@ Also:
   with it, and the app then removes the photo files. You can edit or delete
   only your own replies (only their text can change, and an edit is marked).
   One like per person per entry; you can only remove your own.
+- A reply can answer another reply on the same entry, one level deep (the
+  database rejects deeper or cross-entry answers); deleting a reply deletes
+  its answers. A reply's one photo lives in the private `reply-images`
+  bucket as `<reply id>.jpg`: only its author can upload or remove it, and
+  you can see it only if you can see the reply.
 - `app_releases` (update notices) is readable by the two participants only and
   can't be written from the app.
 - If a note goes back to draft, its replies are hidden from the other person too.
@@ -270,7 +275,11 @@ avatar has its own colour, since both names start with J.
 - **Like:** tap the heart (again to unlike). Both of you see the count.
 - **Reply:** tap the speech bubble (or open the entry) and type in "Reply to …".
   If sending fails, your text stays in the box and it says *Not sent*. ··· on
-  your own reply → Edit / Delete.
+  your own reply → Edit / Delete. The image icon adds one photo (a photo
+  alone is fine too).
+- **Answer a reply:** tap **Reply** under it. Answers sit indented under that
+  reply behind "View n replies"; answering an answer keeps it in the same
+  group and starts it with "@name".
 - **Write:** **+** opens the composer as a sheet over the feed → optional title
   → text → photo or camera icon (up to 3) → (Jarvey only) tap the date beside
   your name to change the day → **Post** (both of you see it) or **Save draft** (only you).
@@ -322,9 +331,9 @@ phones.
 ## 5. Tests
 
 ```bash
-flutter test                                          # 133 unit + widget tests
+flutter test                                          # 140 unit + widget tests
 deno test supabase/functions/_shared/crypto_test.ts   # helper crypto
-deno run -A supabase/tests/migrations_test.ts .       # 108 RLS / database / storage checks
+deno run -A supabase/tests/migrations_test.ts .       # 128 RLS / database / storage checks
 ```
 
 The database tests run the real migrations in PGlite (Postgres in WebAssembly)

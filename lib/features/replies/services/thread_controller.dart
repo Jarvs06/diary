@@ -37,12 +37,20 @@ class ThreadController extends ChangeNotifier {
   AppFailure? _sendFailure;
   bool _disposed = false;
 
-  // A send that failed keeps its id, so retrying the same text can't duplicate.
+  // A send that failed keeps its id, so retrying the same reply can't duplicate.
   String? _pendingId;
-  String? _pendingText;
+  (String, String?, PickedPhoto?)? _pendingReply;
 
   Note? get note => _note;
+
+  /// Every reply, oldest first.
   List<Reply> get replies => _thread;
+
+  /// Replies to the entry itself, oldest first.
+  List<Reply> get topLevel => _thread.where((r) => r.parentId == null).toList();
+
+  /// Answers to the top-level reply [replyId], oldest first.
+  List<Reply> answersTo(String replyId) => _thread.where((r) => r.parentId == replyId).toList();
   List<NotePhoto> get photos => _photoList;
   bool get isLoading => _loading;
 
@@ -83,27 +91,36 @@ class ThreadController extends ChangeNotifier {
     }
   }
 
-  /// Sends [text] as a reply. Returns the saved reply, or null if it failed
-  /// (with [sendFailure] set). Never reports success for an unsaved reply.
-  Future<Reply?> send(String text) async {
+  /// Sends [text] (and [photo], if any) as a reply; with [parentId], as an
+  /// answer to that top-level reply. Returns the saved reply, or null if it
+  /// failed (with [sendFailure] set). Never reports success for an unsaved
+  /// reply.
+  Future<Reply?> send(String text, {String? parentId, PickedPhoto? photo}) async {
     final body = text.trim();
-    if (body.isEmpty || _sending) return null;
+    if ((body.isEmpty && photo == null) || _sending) return null;
 
-    if (_pendingText != body) {
+    final pending = (body, parentId, photo);
+    if (_pendingReply != pending) {
       _pendingId = _newId();
-      _pendingText = body;
+      _pendingReply = pending;
     }
     _sending = true;
     _sendFailure = null;
     _notify();
 
     try {
-      final reply = await _replies.sendReply(id: _pendingId!, noteId: noteId, body: body);
+      final reply = await _replies.sendReply(
+        id: _pendingId!,
+        noteId: noteId,
+        body: body,
+        parentId: parentId,
+        photo: photo,
+      );
       if (!_thread.any((r) => r.id == reply.id)) {
         _thread = [..._thread, reply]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
       }
       _pendingId = null;
-      _pendingText = null;
+      _pendingReply = null;
       return reply;
     } on AppFailure catch (f) {
       _sendFailure = f;
@@ -136,7 +153,7 @@ class ThreadController extends ChangeNotifier {
   /// Changes the text of your own reply. Returns the failure, if any.
   Future<AppFailure?> editReply(Reply reply, String text) async {
     final body = text.trim();
-    if (body.isEmpty || body == reply.body) return null;
+    if ((body.isEmpty && reply.imagePath == null) || body == reply.body) return null;
     try {
       final saved = await _replies.editReply(id: reply.id, body: body);
       _thread = [for (final r in _thread) r.id == saved.id ? saved : r];
@@ -147,11 +164,11 @@ class ThreadController extends ChangeNotifier {
     }
   }
 
-  /// Deletes your own reply. Returns the failure, if any.
+  /// Deletes your own reply, and the answers to it. Returns the failure, if any.
   Future<AppFailure?> deleteReply(Reply reply) async {
     try {
-      await _replies.deleteReply(reply.id);
-      _thread = _thread.where((r) => r.id != reply.id).toList();
+      await _replies.deleteReply(reply);
+      _thread = _thread.where((r) => r.id != reply.id && r.parentId != reply.id).toList();
       _notify();
       return null;
     } on AppFailure catch (f) {
