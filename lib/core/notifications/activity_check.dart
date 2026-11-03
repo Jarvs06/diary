@@ -42,7 +42,7 @@ class SupabaseActivityChecker implements ActivityChecker {
       _client
           .from('replies')
           .select(
-            'id, note_id, author_id, body, created_at, image_path, parent:replies!replies_parent_id_fkey(author_id)',
+            'id, note_id, author_id, body, created_at, image_path, parent:parent_id(author_id)',
           )
           .neq('author_id', me)
           .gt('created_at', since)
