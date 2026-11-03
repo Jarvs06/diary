@@ -1,9 +1,10 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/photo.dart';
+import '../services/photo_saver.dart';
 
 typedef PhotoLoader = Future<Uint8List> Function(String storagePath);
 
@@ -212,6 +213,28 @@ class PhotoViewerScreen extends StatefulWidget {
 class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   late final _pages = PageController(initialPage: widget.initial);
   late int _index = widget.initial;
+  bool _saving = false;
+
+  Future<void> _save(PhotoSaver saver) async {
+    setState(() => _saving = true);
+    String? message;
+    try {
+      await saver.save(await widget.load(widget.paths[_index]));
+      // In the browser the share sheet or download already says what happened.
+      if (!kIsWeb) message = 'Saved to your photos';
+    } on AppFailure catch (f) {
+      message = f.message;
+    } catch (_) {
+      message = "Couldn't save the photo. Please try again.";
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
 
   @override
   void dispose() {
@@ -222,6 +245,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final count = widget.paths.length;
+    final saver = PhotoSaverScope.maybeOf(context);
     return Scaffold(
       key: const Key('photo-viewer'),
       backgroundColor: Colors.black,
@@ -232,6 +256,21 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         title: count > 1
             ? Text('${_index + 1} of $count', style: const TextStyle(color: Colors.white, fontSize: 16))
             : null,
+        actions: [
+          if (saver != null)
+            IconButton(
+              key: const Key('save-photo-button'),
+              tooltip: 'Save photo',
+              onPressed: _saving ? null : () => _save(saver),
+              icon: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.download_rounded),
+            ),
+        ],
       ),
       body: PageView.builder(
         controller: _pages,

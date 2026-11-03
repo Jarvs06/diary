@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/app_dependencies.dart';
+import 'features/photos/services/photo_saver.dart';
 import 'core/errors/app_failure.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/ornaments.dart';
@@ -32,11 +33,12 @@ class LetterApp extends StatelessWidget {
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         // Status bar icons that stay visible on screens without an app bar.
         value:
-            (Theme.of(context).brightness == Brightness.light
-                    ? SystemUiOverlayStyle.dark
-                    : SystemUiOverlayStyle.light)
+            (Theme.of(context).brightness == Brightness.light ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light)
                 .copyWith(statusBarColor: Colors.transparent),
-        child: AppLock(dependencies: dependencies, lockAfter: lockAfter, child: child!),
+        child: PhotoSaverScope(
+          saver: dependencies.photoSaver,
+          child: AppLock(dependencies: dependencies, lockAfter: lockAfter, child: child!),
+        ),
       ),
       home: _StartGate(dependencies: dependencies),
     );

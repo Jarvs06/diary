@@ -21,6 +21,7 @@ import 'package:secret_diary/features/participants/models/participant.dart';
 import 'package:secret_diary/features/photos/data/photos_repository.dart';
 import 'package:secret_diary/features/photos/models/photo.dart';
 import 'package:secret_diary/features/photos/services/photo_picker.dart';
+import 'package:secret_diary/features/photos/services/photo_saver.dart';
 import 'package:secret_diary/features/replies/data/replies_repository.dart';
 import 'package:secret_diary/features/replies/models/reply.dart';
 
@@ -654,6 +655,7 @@ class FakeWorld {
   final releases = FakeReleasesRepository();
   int buildNumber = 1;
   final exportSaver = FakeExportSaver();
+  final photoSaver = FakePhotoSaver();
 
   AppDependencies get dependencies => AppDependencies(
     accessRepository: access,
@@ -672,6 +674,7 @@ class FakeWorld {
     releases: releases,
     buildNumber: buildNumber,
     exportSaver: exportSaver,
+    photoSaver: photoSaver,
   );
 }
 
@@ -769,6 +772,17 @@ class FakeReleasesRepository implements ReleasesRepository {
 
   @override
   Future<AppRelease?> latest() async => release;
+}
+
+class FakePhotoSaver implements PhotoSaver {
+  final saved = <Uint8List>[];
+  AppFailure? nextFailure;
+
+  @override
+  Future<void> save(Uint8List bytes) async {
+    if (nextFailure != null) throw nextFailure!;
+    saved.add(bytes);
+  }
 }
 
 class FakeExportSaver implements ExportSaver {

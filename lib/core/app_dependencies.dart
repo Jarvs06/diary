@@ -3,6 +3,7 @@ import '../features/notes/data/notes_repository.dart';
 import '../features/participants/data/participants_repository.dart';
 import '../features/photos/data/photos_repository.dart';
 import '../features/photos/services/photo_picker.dart';
+import '../features/photos/services/photo_saver.dart';
 import '../features/replies/data/replies_repository.dart';
 import '../features/export/diary_export.dart';
 import 'auth/auth_session.dart';
@@ -33,6 +34,7 @@ class AppDependencies {
     required this.releases,
     required this.buildNumber,
     required this.exportSaver,
+    required this.photoSaver,
   });
 
   final AccessRepository accessRepository;
@@ -53,4 +55,5 @@ class AppDependencies {
   /// This APK's build number (the part after + in pubspec's version).
   final int buildNumber;
   final ExportSaver exportSaver;
+  final PhotoSaver photoSaver;
 }

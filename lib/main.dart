@@ -24,6 +24,7 @@ import 'features/notes/data/notes_repository.dart';
 import 'features/participants/data/participants_repository.dart';
 import 'features/photos/data/photos_repository.dart';
 import 'features/photos/services/photo_picker.dart';
+import 'features/photos/services/photo_saver.dart';
 import 'features/replies/data/replies_repository.dart';
 
 Future<void> main() async {
@@ -87,6 +88,7 @@ Future<void> main() async {
         releases: SupabaseReleasesRepository(client),
         buildNumber: int.tryParse(package.buildNumber) ?? 0,
         exportSaver: const ShareExportSaver(),
+        photoSaver: const DevicePhotoSaver(),
       ),
     ),
   );

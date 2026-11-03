@@ -271,7 +271,8 @@ avatar has its own colour, since both names start with J.
   cut to 6 lines (2 when there are photos) with **See more**. Pull down to
   refresh; tap Home again to jump to the top.
 - **Read an entry:** tap it to open its page with all replies underneath.
-  Tap a photo to see it full screen (swipe between them, pinch to zoom).
+  Tap a photo to see it full screen (swipe between them, pinch to zoom); the
+  download icon saves it to your photos (on iPhone, the share sheet → Save Image).
 - **Like:** tap the heart (again to unlike). Both of you see the count.
 - **Reply:** tap the speech bubble (or open the entry) and type in "Reply to …".
   If sending fails, your text stays in the box and it says *Not sent*. ··· on
@@ -331,7 +332,7 @@ phones.
 ## 5. Tests
 
 ```bash
-flutter test                                          # 140 unit + widget tests
+flutter test                                          # 143 unit + widget tests
 deno test supabase/functions/_shared/crypto_test.ts   # helper crypto
 deno run -A supabase/tests/migrations_test.ts .       # 128 RLS / database / storage checks
 ```

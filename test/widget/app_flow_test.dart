@@ -12,6 +12,7 @@ import 'package:secret_diary/core/updates/releases.dart';
 import 'package:secret_diary/core/utils/dates.dart';
 import 'package:secret_diary/core/widgets/ornaments.dart';
 import 'package:secret_diary/features/notes/models/note.dart';
+import 'package:secret_diary/features/photos/widgets/photo_widgets.dart';
 
 import '../support/fakes.dart';
 
@@ -911,6 +912,43 @@ void main() {
       expect(world.replies.store, isEmpty);
       expect(find.text('Answer'), findsNothing);
       expect(find.text('No replies yet'), findsOneWidget);
+    });
+  });
+
+  group('saving photos', () {
+    testWidgets('a post photo can be saved from the full-screen viewer', (tester) async {
+      world.auth.userId = janinaId;
+      world.photos.seed('p1', 'n1');
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tester.tap(find.byType(RemotePhoto).first);
+      await tester.pumpAndSettle();
+      await tapKey(tester, const Key('save-photo-button'));
+
+      expect(world.photoSaver.saved.single, pngBytes);
+      expect(find.text('Saved to your photos'), findsOneWidget);
+    });
+
+    testWidgets('a reply photo can be saved too', (tester) async {
+      world.auth.userId = meId;
+      final r = world.replies.addFrom(janinaId, 'n1', 'Look', withPhoto: true);
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tapKey(tester, ValueKey('reply-photo-${r.imagePath}'));
+      await tapKey(tester, const Key('save-photo-button'));
+      expect(world.photoSaver.saved, hasLength(1));
+    });
+
+    testWidgets('a failed save says why', (tester) async {
+      world.auth.userId = janinaId;
+      world.photos.seed('p1', 'n1');
+      world.photoSaver.nextFailure = const InvalidContent('Allow access to your photos to save it.');
+      await start(tester);
+      await openPost(tester, 'n1');
+      await tester.tap(find.byType(RemotePhoto).first);
+      await tester.pumpAndSettle();
+      await tapKey(tester, const Key('save-photo-button'));
+      expect(find.text('Allow access to your photos to save it.'), findsOneWidget);
     });
   });
 
