@@ -433,29 +433,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+              padding: const EdgeInsets.fromLTRB(8, 14, 8, 10),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   const BrandTitle(),
                   Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      key: const Key('search-button'),
+                      tooltip: 'Search',
+                      icon: const Icon(Icons.search_rounded),
+                      onPressed: _openSearch,
+                    ),
+                  ),
+                  Align(
                     alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          key: const Key('search-button'),
-                          tooltip: 'Search',
-                          icon: const Icon(Icons.search_rounded),
-                          onPressed: _openSearch,
-                        ),
-                        IconButton(
-                          key: const Key('calendar-button'),
-                          tooltip: 'Calendar',
-                          icon: const Icon(Icons.calendar_month_outlined),
-                          onPressed: _openCalendar,
-                        ),
-                      ],
+                    child: IconButton(
+                      key: const Key('calendar-button'),
+                      tooltip: 'Calendar',
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      onPressed: _openCalendar,
                     ),
                   ),
                 ],
